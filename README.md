@@ -14,6 +14,6 @@ This is my first full-stack project built with React + Vite.
 ## Tech Stack
 - React.js
 - Vite
-- Tailwind CSS (coming soon)
+- Tailwind CSS 
 
 Made with ❤️ by Abhijeet
