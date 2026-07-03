@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-// import { motion } from 'framer-motion'; // Uncomment if you want animations
+import { motion } from 'framer-motion'; 
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -23,41 +23,55 @@ const SignUp = () => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError(''); // Clear error on input
+    setError(''); 
   };
 
   const handleOtpChange = (e) => {
-    // Only allow numbers and max 6 digits
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
     setOtp(value);
   };
 
-  // Send OTP
+  // Step 1: Validate Form & Send OTP
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError('');
 
-    let phone = formData.phone.trim();
-    if (!phone) {
+    // 1. Client-side Form Validation
+    if (!formData.fullName || !formData.email || !formData.password) {
+      setError("Please fill all required fields");
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    let cleanPhone = formData.phone.trim();
+    if (!cleanPhone) {
       setError("Please enter your phone number");
       return;
     }
 
     // Clean and validate Indian phone number
-    phone = phone.replace(/^(\+91|91|0)/, '');
-    if (!/^\d{10}$/.test(phone)) {
+    cleanPhone = cleanPhone.replace(/^(\+91|91|0)/, '');
+    if (!/^\d{10}$/.test(cleanPhone)) {
       setError("Please enter a valid 10-digit Indian phone number");
       return;
     }
 
-    setFormData((prev) => ({ ...prev, phone }));
+    // Sync back to state, but use local cleanPhone for the immediate API call
+    setFormData((prev) => ({ ...prev, phone: cleanPhone }));
     setLoading(true);
 
     try {
       const response = await fetch('http://localhost:5000/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone: cleanPhone }),
       });
 
       const data = await response.json();
@@ -74,7 +88,7 @@ const SignUp = () => {
     }
   };
 
-  // Verify OTP + Complete Signup
+  // Step 2: Verify OTP + Complete Registration
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setError('');
@@ -90,7 +104,13 @@ const SignUp = () => {
       const response = await fetch('http://localhost:5000/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: formData.phone, otp }),
+        body: JSON.stringify({ 
+          phone: formData.phone, 
+          otp,
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password // Backend should hash this before storing!
+        }),
       });
 
       const data = await response.json();
@@ -108,30 +128,6 @@ const SignUp = () => {
     }
   };
 
-  // Full form submit (Step 1)
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-
-    // Basic validation
-    if (!formData.fullName || !formData.email || !formData.password) {
-      setError("Please fill all required fields");
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
-
-    handleSendOtp(e);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 to-black flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center">
@@ -139,13 +135,17 @@ const SignUp = () => {
         <h1 className="text-5xl font-bold text-white mb-3 tracking-tight">बात-चीत</h1>
         <p className="text-zinc-400 text-lg mb-8">Create your account</p>
 
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-700 rounded-3xl p-8">
+        {/* Optional: Added framer-motion wrap since you imported it but didn't use it */}
+        <motion.div 
+          layout
+          className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-700 rounded-3xl p-8"
+        >
           <h2 className="text-2xl text-white font-semibold mb-6">
             {step === 1 ? 'Sign Up' : 'Verify Your Phone'}
           </h2>
 
           {step === 1 ? (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSendOtp} className="space-y-5">
               <input
                 type="text"
                 name="fullName"
@@ -252,13 +252,13 @@ const SignUp = () => {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="text-zinc-400 hover:text-white text-sm underline"
+                className="text-zinc-400 hover:text-white text-sm underline block mx-auto"
               >
                 ← Change phone number
               </button>
             </form>
           )}
-        </div>
+        </motion.div>
       </div>
     </div>
   );
