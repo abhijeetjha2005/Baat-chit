@@ -1,14 +1,13 @@
-import React from 'react'
+import React, {useRef, useState }from "react";
+import {Send,Camera,Mic,FolderOpen,Paperclip} from 'lucide-react'
 
-const Chatright = () => {
-  return (
-    <div className='h-full p-4 bg-zinc-900'>
-   <div className='h-full w-full bg-zinc-800 rounded-2xl border border-zinc-700 shadow-lg'>
-   
-  </div>
+const Chatright=()=>{
+  const fileInputRef=useRef(null)
+  const CameraInputref =useRef(null)
+  const [message,setMessage]=useState('')
+  // handlers
+  const handleFolderClick=()=>fileInputRef.current?.click()
+  const hanleCameraClick=()=>CameraInputRef.current?.click()
 
-    </div>
-  )
 }
-
-export default Chatright
+export default ChatRight;
