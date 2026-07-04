@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
+import Friends from '../pages/Friends'
 import {Search} from 'lucide-react'
+
 
 const Chatleft = () => {
   const [searchTerm,setSearchTerm]=useState("")
@@ -30,6 +32,7 @@ const Chatleft = () => {
   </div>
   </div>
 </div>
+     <Friends/>
 </div>
  </div>
   )
