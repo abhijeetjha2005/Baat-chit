@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-import { motion } from 'framer-motion'; 
+import { motion } from 'framer-motion';
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -23,7 +23,7 @@ const SignUp = () => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError(''); 
+    setError('');
   };
 
   const handleOtpChange = (e) => {
@@ -31,13 +31,11 @@ const SignUp = () => {
     setOtp(value);
   };
 
-  // Step 1: Validate Form & Send OTP
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError('');
 
-    // 1. Client-side Form Validation
-    if (!formData.fullName || !formData.email || !formData.password) {
+    if (!formData.fullName || !formData.email || !formData.password || !formData.phone) {
       setError("Please fill all required fields");
       return;
     }
@@ -50,21 +48,13 @@ const SignUp = () => {
       return;
     }
 
-    let cleanPhone = formData.phone.trim();
-    if (!cleanPhone) {
-      setError("Please enter your phone number");
-      return;
-    }
-
-    // Clean and validate Indian phone number
-    cleanPhone = cleanPhone.replace(/^(\+91|91|0)/, '');
+    let cleanPhone = formData.phone.replace(/^(\+91|91|0)/, '').trim();
     if (!/^\d{10}$/.test(cleanPhone)) {
       setError("Please enter a valid 10-digit Indian phone number");
       return;
     }
 
-    // Sync back to state, but use local cleanPhone for the immediate API call
-    setFormData((prev) => ({ ...prev, phone: cleanPhone }));
+    setFormData(prev => ({ ...prev, phone: cleanPhone }));
     setLoading(true);
 
     try {
@@ -82,13 +72,12 @@ const SignUp = () => {
         setError(data.message || "Failed to send OTP");
       }
     } catch (err) {
-      setError("Server error. Please try again later.");
+      setError("Server error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 2: Verify OTP + Complete Registration
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setError('');
@@ -109,7 +98,7 @@ const SignUp = () => {
           otp,
           fullName: formData.fullName,
           email: formData.email,
-          password: formData.password // Backend should hash this before storing!
+          password: formData.password
         }),
       });
 
@@ -129,19 +118,20 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 to-black flex items-center justify-center px-4 py-6 sm:px-6">
-      <div className="max-w-md w-full text-center">
-        <Logo />
-        <h1 className="text-5xl font-bold text-white mb-3 tracking-tight">बात-चीत</h1>
-        <p className="text-zinc-400 text-lg mb-8">Create your account</p>
+    <div className="min-h-screen bg-gradient-to-br from-zinc-950 to-black flex items-center justify-center px-4 py-8 sm:px-6">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <Logo />
+          <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mt-4">बात-चीत</h1>
+          <p className="text-zinc-400 mt-2">Create your account</p>
+        </div>
 
-        {/* Optional: Added framer-motion wrap since you imported it but didn't use it */}
         <motion.div 
           layout
-          className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-700 rounded-3xl p-8"
+          className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-700 rounded-3xl p-6 sm:p-8 shadow-2xl"
         >
-          <h2 className="text-2xl text-white font-semibold mb-6">
-            {step === 1 ? 'Sign Up' : 'Verify Your Phone'}
+          <h2 className="text-2xl font-semibold text-white text-center mb-8">
+            {step === 1 ? 'Sign Up' : 'Verify Phone Number'}
           </h2>
 
           {step === 1 ? (
@@ -149,31 +139,28 @@ const SignUp = () => {
               <input
                 type="text"
                 name="fullName"
-                placeholder="Full name"
+                placeholder="Full Name"
                 value={formData.fullName}
                 onChange={handleChange}
-                className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition"
-                required
+                className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
               />
 
               <input
                 type="tel"
                 name="phone"
-                placeholder="Phone number (10 digits)"
+                placeholder="Phone Number (10 digits)"
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition"
-                required
+                className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
               />
 
               <input
                 type="email"
                 name="email"
-                placeholder="E-mail"
+                placeholder="Email Address"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition"
-                required
+                className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
               />
 
               <div className="relative">
@@ -183,13 +170,12 @@ const SignUp = () => {
                   placeholder="Password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition"
-                  required
+                  className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-4 text-zinc-400 hover:text-white text-sm"
+                  className="absolute right-5 top-4 text-sm text-zinc-400 hover:text-white"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -202,59 +188,59 @@ const SignUp = () => {
                   placeholder="Confirm Password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition"
-                  required
+                  className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-4 text-zinc-400 hover:text-white text-sm"
+                  className="absolute right-5 top-4 text-sm text-zinc-400 hover:text-white"
                 >
                   {showConfirmPassword ? "Hide" : "Show"}
                 </button>
               </div>
 
-              {error && <p className="text-red-500 text-sm text-left">{error}</p>}
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-70 text-white font-semibold rounded-2xl transition-all duration-200"
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-70 text-white font-semibold rounded-2xl transition-all"
               >
-                {loading ? 'Sending OTP...' : 'Continue'}
+                {loading ? 'Sending OTP...' : 'Continue →'}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <p className="text-zinc-400 text-sm mb-4">
-                We've sent a 6-digit code to <span className="font-medium text-white">+91 {formData.phone}</span>
+            <form onSubmit={handleVerifyOtp} className="space-y-6">
+              <p className="text-center text-zinc-400">
+                We've sent a 6-digit code to <br />
+                <span className="font-medium text-white">+91 {formData.phone}</span>
               </p>
 
               <input
                 type="text"
                 value={otp}
                 onChange={handleOtpChange}
-                placeholder="Enter 6-digit OTP"
+                placeholder="000000"
                 maxLength={6}
-                className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white text-center text-2xl tracking-widest placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition"
+                className="w-full px-5 py-5 bg-zinc-800 border border-zinc-700 rounded-2xl text-center text-3xl tracking-[8px] text-white focus:outline-none focus:border-emerald-500"
               />
 
-              {error && <p className="text-red-500 text-sm">{error}</p>}
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
               <button
                 type="submit"
                 disabled={loading || otp.length !== 6}
-                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-70 text-white font-semibold rounded-2xl transition-all duration-200"
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-70 text-white font-semibold rounded-2xl transition-all"
               >
-                {loading ? 'Verifying...' : 'Verify OTP'}
+                {loading ? 'Verifying...' : 'Verify & Create Account'}
               </button>
 
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="text-zinc-400 hover:text-white text-sm underline block mx-auto"
+                className="text-zinc-400 hover:text-white text-sm block mx-auto"
               >
-                ← Change phone number
+                ← Change Phone Number
               </button>
             </form>
           )}
