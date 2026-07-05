@@ -129,7 +129,7 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 to-black flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-br from-zinc-950 to-black flex items-center justify-center px-4 py-6 sm:px-6">
       <div className="max-w-md w-full text-center">
         <Logo />
         <h1 className="text-5xl font-bold text-white mb-3 tracking-tight">बात-चीत</h1>
