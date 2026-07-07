@@ -1,12 +1,16 @@
-const dns = require("node:dns/promises");
-dns.setServers(["8.8.8.8","1.1.1.1"])
-const connectDb=require("./src/config/db")
-require('dotenv').config()
+const dns = require("dns");
 
-const app=require('./src/app')
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
+require("dotenv").config();
+
+const connectDb = require("./src/config/db");
+const app = require("./src/app");
 
 connectDb();
-app.listen(3000,()=>{
-console.log("running");
 
-})
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});

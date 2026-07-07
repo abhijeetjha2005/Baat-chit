@@ -1,6 +1,6 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('./models/user.model');
+const User = require('../models/user.model');
 
 const login = async (req, res) => {
      try{
@@ -29,7 +29,7 @@ const token =jwt.sign(
 return res.status(200).json({
   message:"Login successfull",
   token,
-  use:{id:user._id,email:user.email}
+  user:{id:user._id,email:user.email}
 })
      }catch(error){
       console.error("Backend Login Error:", error);
