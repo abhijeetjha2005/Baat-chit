@@ -15,5 +15,5 @@ This is my first full-stack project built with React + Vite.
 - React.js
 - Vite
 - Tailwind CSS 
-
+- MERN Stack
 Made with ❤️ by Abhijeet
