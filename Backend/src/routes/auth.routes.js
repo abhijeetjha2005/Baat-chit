@@ -1,18 +1,19 @@
-const express =require('express')
-const router=express.Router()
-const {login}=require('../controllers/auth.controller')
-const rateLimit=require('express-rate-limit')
+const express = require('express');
+const router = express.Router();
 
-// Brute forcce protection 
-// block for 15 min
-const loginLimiter= rateLimit({
-  windowMs: 15 * 60 * 1000, 
-    max: 5, 
-    message: { message: "Too many login attempts. Try again in 15 minutes." },
-    standardHeaders: true, 
-    legacyHeaders: false,
-})
-router.post('/login', loginLimiter, login);
+// Import controllers
+const { 
+  sendOtp, 
+  registerUser, 
+  login 
+} = require('../controllers/auth.controller');
 
-module.exports=router;
+// Import middleware (if you have it)
+const { loginLimiter } = require('../middleware/auth.middleware');
 
+// Routes
+router.post('/send-otp', sendOtp);           // Send OTP
+router.post('/register', registerUser);      // Register with OTP verification
+router.post('/login', loginLimiter, login);  // Login with rate limiting
+
+module.exports = router;
