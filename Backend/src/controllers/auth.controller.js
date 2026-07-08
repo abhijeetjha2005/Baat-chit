@@ -25,6 +25,23 @@ phoneNumber,
 otp:otpCode,
 expiresAt: new Date(Date.now() + 10 * 60 * 1000)
 })
+
+// send real sms via fast2sms
+const response =await fetch("https://www.fast2sms.com/dev/bulkV2",{
+  method:'POST',
+  headers:{
+'authorization': process.env.FAST2SMS_API_KEY,
+        'Content-Type': 'application/json'
+  },
+  body:JSON.stringify({
+    route: "q",
+        message: `Your verification code is ${otpCode}. Valid for 10 minutes.`,
+        numbers: phoneNumber.replace('+91', ''),  // Remove +91 if present
+        flash: 0
+  })
+})
+
+
 // TODO: Later integrate real SMS API
 console.log(`✅ OTP for ${phoneNumber} → ${otpCode}`);
 res.status(200).json({

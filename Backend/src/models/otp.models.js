@@ -12,7 +12,7 @@ const otpSchema= new mongoose.Schema({
     minlength:6,
     maxlength:6
   },
-  expireAt:{
+  expiresAt:{
     type:Date,
     required:true
   }
@@ -22,6 +22,6 @@ const otpSchema= new mongoose.Schema({
 })
 
 // AutoDelete expire opt
-otpSchema.index({expiresAT:1},{expireAfterSeconds:0})
+otpSchema.index({expiresAt:1},{expireAfterSeconds:0})
 
 module.exports = mongoose.model('OTP', otpSchema);
