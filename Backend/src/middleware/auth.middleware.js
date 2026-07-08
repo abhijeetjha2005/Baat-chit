@@ -9,5 +9,14 @@ const loginLimiter= rateLimit({
     standardHeaders: true, 
     legacyHeaders: false,
 })
+// Optional: General API rate limiter
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute
+  message: {
+    success: false,
+    message: "Too many requests, please try again later."
+  }
+});
 
-module.exports = { loginLimiter };
+module.exports = { loginLimiter,apiLimiter };
