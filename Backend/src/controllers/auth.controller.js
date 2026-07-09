@@ -10,63 +10,78 @@ const OTP = require('../models/otp.models');
 const sendOtp = async (req, res) => {
   try {
     const { email } = req.body;
+
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: "Email address is required"
+        message: "Email is required",
       });
     }
 
-    // Generate 6-digit OTP
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return res.status(500).json({
+        success: false,
+        message: "Email credentials are missing in .env",
+      });
+    }
+
+    // Generate OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Remove old OTP if exists to keep DB clean
+    // Delete previous OTP
     await OTP.findOneAndDelete({ email });
 
     // Save new OTP
     await OTP.create({
       email,
       otp: otpCode,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000) // Valid for 10 minutes
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     });
 
-    // Configure Nodemailer Transporter
+    // Create transporter
     const transporter = nodemailer.createTransport({
-      service: 'gmail', 
+      service: "gmail",
       auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS  
-      }
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
     });
 
-    // Setup Email Options
-    const mailOptions = {
-      from: `"Your App Name" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Your Verification Code",
-      text: `Your verification code is ${otpCode}. It is valid for 10 minutes.`,
-      html: `<p>Your verification code is <b>${otpCode}</b>.</p><p>Valid for 10 minutes.</p>`
-    };
+    console.log("EMAIL_USER:", process.env.EMAIL_USER);
+console.log(
+  "EMAIL_PASS Length:",
+  process.env.EMAIL_PASS.replace(/\s/g, "").length
+);
+    // Verify transporter
+    await transporter.verify();
 
-    // Send email via Nodemailer
-    await transporter.sendMail(mailOptions);
-    
-    console.log(`✅ OTP for ${email} → ${otpCode}`);
-    
+    // Send email
+    await transporter.sendMail({
+      from: `"Baat-Chit" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "OTP Verification",
+      text: `Your OTP is ${otpCode}. It is valid for 10 minutes.`,
+      html: `
+        <h2>Email Verification</h2>
+        <p>Your OTP is:</p>
+        <h1>${otpCode}</h1>
+        <p>This OTP is valid for 10 minutes.</p>
+      `,
+    });
+
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully to your email"
+      message: "OTP sent successfully",
     });
-
   } catch (error) {
     console.error("Send OTP Error:", error);
+
     return res.status(500).json({
       success: false,
-      message: "Failed to send OTP"
-    }); 
+      message: error.message,
+    });
   }
 };
-
 
 // 2. REGISTER USER (EMAIL ONLY)
 
