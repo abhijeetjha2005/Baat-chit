@@ -7,19 +7,21 @@ require("dotenv").config();
 
 const connectDb = require("./src/config/db");
 const app = require("./src/app");
-const setupWebSocket = require('./websocket');
+const setupWebSocket = require("./websocket");
 
+// Connect to MongoDB
 connectDb();
 
 // Create HTTP Server
 const server = http.createServer(app);
 
-// Setup WebSocket
+// Initialize WebSocket Server
 setupWebSocket(server);
 
+// Start Server
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`WebSocket is also running`);
+  console.log(` Server running on port ${PORT}`);
+  console.log("WebSocket server is running");
 });
