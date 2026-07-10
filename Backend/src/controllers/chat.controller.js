@@ -2,7 +2,7 @@ const Conversation = require('../models/conversation.model');
 const Message = require('../models/message.model');
 
 
-// 1. Get or Create Conversation + Load Messages
+// 1. Get or Create Conversation + Load Messages personal chat
 exports.getOrCreateConversation=async (req,res)=>{
   try{
     const senderId=req.user.id;
@@ -11,9 +11,14 @@ exports.getOrCreateConversation=async (req,res)=>{
       return res.status(400).json({message:"Receiver not found "})
     }
     // Find conversation involving BOTH users
-   let conversation = await Conversation.findOne({
-  participants: { $all: [senderId, receiverId] }
+    let conversation = await Conversation.findOne({
+  isGroup: false,
+  participants: {
+    $all: [senderId, receiverId]
+  }
 });
+
+
 
 // 2. If no conversation exists between these two, create one
 
@@ -48,33 +53,72 @@ res.status(200).json({
  * @acess  Private
  */
 
-// send messages
-exports.sendMessage=async(req,res)=>{
-  try{
+// 2. GROUP CHAT: Create Group
 
-const senderId= req.user.id
-const {conversationId,text}=req.body
-if(!conversationId|| !text){
-  return res.status(400).json
-({message:"Conversation ID and text are required."})
+exports.createGroup = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const { title, participantIds } = req.body; // Array of user IDs
 
-}
-// Create and save message
-const newMessage =await Message.create({
-  conversationId,
-  sender:senderId,
-  text
-})
-// Update the conversation's last message reference
-await Conversation.findByIdAndUpdate(conversationId,
-  {lastMessage:newMessage._id
-}
-)
+    if (!title || !participantIds || participantIds.length === 0) {
+      return res.status(400).json({ message: "Group title and members are required." });
+    }
 
-  }catch(error){
-    res.status(500).json({message:"server error",error: error.message})
+    // Ensure the creator is included in the group members array
+    const uniqueParticipants = Array.from(new Set([...participantIds, adminId]));
+
+    const group = await Conversation.create({
+      groupTitle: title,
+      participants: uniqueParticipants,
+      isGroup: true,
+      groupAdmin: adminId
+    });
+
+    res.status(201).json(group);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
+};
+
+// send messages
+exports.sendMessage = async (req, res) => {
+  try {
+    const senderId = req.user.id;
+    const { conversationId, text } = req.body;
+    
+    if (!conversationId || !text) {
+      return res.status(400).json({ message: "Conversation ID and text are required." });
+    }
+
+    // Verify sender belongs to this conversation/group
+    const conversation = await Conversation.findById(conversationId);
+
+    const isParticipant = conversation?.participants.some(
+  (id) => id.toString() === senderId
+);
+
+
+if (!conversation || !isParticipant) {
+  return res.status(403).json({
+    message: "Unauthorized to post in this chat."
+  });
 }
+    const newMessage = await Message.create({
+      conversationId,
+      sender: senderId,
+      text
+    });
+
+    // FIXED: Corrected Mongoose syntax (ID, updateBody)
+    await Conversation.findByIdAndUpdate(conversationId, { 
+      lastMessage: newMessage._id 
+    });
+
+    res.status(201).json(newMessage);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
 
 // unsend
 exports.deleteMessage=async(req,res)=>{
@@ -85,7 +129,7 @@ exports.deleteMessage=async(req,res)=>{
     // Find the message first to verify ownership
     const message =await Message.findById(messageId)
     if(!message){
-      return res.status.status(404).json({message: "Message not found."})
+      return res.status(404).json({message: "Message not found."})
 
     }
     //  Security Check: Only the sender can delete their own message
@@ -108,31 +152,40 @@ res.status(500).json({ message: "Server Error", error: error.message });
   }
 }
 
-// clear chat
 
-exports.deleteConversation=async=>{
+// delete conversation
+exports.deleteconversation=async(req,res)=>{
   try{
-const userID=req.user.id;
-const {conversationId}=req.params;
 
-const conversation= await Conversation.findById(conversationId);
-if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found." });
+    const userId = req.user.id;
+    const { conversationId } = req.params;
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) return res.status(404).json({ message: "Chat not found." });
+
+    // Group Security Rule: Only group admin can completely dissolve a group chat
+    if (conversation.isGroup && conversation.groupAdmin.toString() !== userId) {
+      return res.status(403).json({ message: "Only group admins can delete group chats." });
     }
 
-    if (!conversation.participants.includes(userId)) {
-      return res.status(403).json({ message: "Unauthorized to delete this chat." });
-    }
+    // Personal Chat Security Rule: Must be part of it
+const isParticipant = conversation.participants.some(
+  (id) => id.toString() === userId
+);
 
-    // Delete all messages linked to this conversation
+if (!conversation.isGroup && !isParticipant) {
+  return res.status(403).json({
+    message: "Unauthorized."
+  });
+}  
+
     await Message.deleteMany({ conversationId });
-
-    // Delete the conversation document itself
     await Conversation.findByIdAndDelete(conversationId);
 
-res.status(200).json({ message: "Conversation and chat history cleared successfully." });
-
+   return res.status(200).json({
+  message: "Conversation deleted successfully."
+});
   }catch(error){
-    res.status(500).json({ message: "Server Error", error: error.message });
+res.status(500).json({ message: "Server Error", error: error.message });
   }
 }

@@ -1,24 +1,33 @@
-const mongoose = require ('mongoose');
+const mongoose = require('mongoose');
 
-const conversationSchema=new mongoose.Schema({
-  participants:[
+const ConversationSchema = new mongoose.Schema({
+  participants: [
     {
-      type:mongoose.Schema.Types.ObjectId,
-      ref:'User',
-      required:true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
     }
   ],
-  lastMessage:{
-    type:mongoose.Schema.Types.ObjectId,
-    ref:"Message",
-    default: null,
+  isGroup: {
+    type: Boolean,
+    default: false
+  },
+  groupTitle: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  groupAdmin: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null // Only populated if isGroup is true
+  },
+  lastMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
   }
- } ,{ timestamps: true });
+}, { timestamps: true });
 
+ConversationSchema.index({ participants: 1 });
 
-
-conversationSchema.index({participants:1})
-
-
-module.exports = mongoose.model("Conversation", conversationSchema);
-
+module.exports = mongoose.model('Conversation', ConversationSchema);
