@@ -46,7 +46,7 @@ const SignUp = () => {
     setLoading(true);
 
     try {
-      const response =await axios.post(  "http://localhost:3000/api/auth/register",
+      const response =await axios.post(  "http://localhost:3000/api/auth/send-otp",
           {
       name: formData.fullName,
       email: formData.email,
@@ -63,7 +63,7 @@ const SignUp = () => {
 
       if (data.success) {
         alert("🎉 Account created successfully!");
-        navigate('/chat');
+        navigate('/otp');
       } else {
         setError(data.message || "Failed to create account");
       }
