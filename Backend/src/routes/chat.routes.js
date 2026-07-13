@@ -1,14 +1,14 @@
 const express=require('express')
 const router = express.Router();
-const auth = require('../middleware/auth');
+const {auth }= require('../middleware/auth.middleware');
 
-const { 
+const  { 
   getOrCreateConversation, 
   createGroup,
   sendMessage, 
   deleteMessage, 
   deleteConversation 
-} = require('../controllers/chatController');
+} = require('../controllers/chat.controller');
 
 router.get('/user/:receiverId', auth, getOrCreateConversation);
 

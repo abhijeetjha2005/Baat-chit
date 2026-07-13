@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-
+const { auth } = require('../middleware/auth.middleware');
+const { loginLimiter } = require('../middleware/auth.middleware');
 // Import controllers
 const { 
   sendOtp, 
@@ -9,7 +10,6 @@ const {
 } = require('../controllers/auth.controller');
 
 // Import middleware (if you have it)
-const { loginLimiter } = require('../middleware/auth.middleware');
 
 // Routes
 router.post('/send-otp', sendOtp);           // Send OTP

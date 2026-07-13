@@ -154,7 +154,7 @@ res.status(500).json({ message: "Server Error", error: error.message });
 
 
 // delete conversation
-exports.deleteconversation=async(req,res)=>{
+exports.deleteConversation=async(req,res)=>{
   try{
 
     const userId = req.user.id;

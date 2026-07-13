@@ -1,4 +1,32 @@
 const rateLimit=require('express-rate-limit')
+const jwt = require("jsonwebtoken");
+
+
+// token
+const auth =(req,res,next)=>{
+  try{
+    const token= req.cookies?.token;
+
+      if (!token) {
+      return res.status(401).json({
+        message: "Access denied. No token provided."
+      });
+    }
+      // Verify JWT
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+       // Make user data available in controllers
+    req.user = decoded;
+ 
+    next();
+  }catch(error){
+        return res.status(401).json({
+      message: "Invalid or expired token."
+    });
+  }
+  }
+
+
 
 // Brute forcce protection 
 // block for 15 min
@@ -19,4 +47,4 @@ const apiLimiter = rateLimit({
   }
 });
 
-module.exports = { loginLimiter,apiLimiter };
+module.exports = {auth, loginLimiter,apiLimiter };
