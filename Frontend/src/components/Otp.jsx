@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 
 const Otp = ({
-  phone,
+  email,
   onVerify,
   onResend,
   loading = false
@@ -9,7 +9,7 @@ const Otp = ({
   const [otp, setOtp] = useState(new Array(6).fill(''));
   const inputRefs = useRef([]);
 
-  // Auto focus first input
+  // Auto focus first input field on mount
   useEffect(() => {
     if (inputRefs.current[0]) {
       inputRefs.current[0].focus();
@@ -23,7 +23,7 @@ const Otp = ({
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
 
-    // Auto move to next input
+    // Auto move focus to next input field
     if (value && index < 5 && inputRefs.current[index + 1]) {
       inputRefs.current[index + 1].focus();
     }
@@ -60,17 +60,17 @@ const Otp = ({
       <div className="max-w-md w-full text-center">
         <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-3xl p-6 sm:p-8 space-y-8 shadow-2xl">
           
-          {/* Header */}
+          {/* Header Area */}
           <div className="text-center">
             <h2 className="text-2xl font-semibold text-white mb-2">Enter OTP</h2>
             <p className="text-zinc-400 text-sm">
               We've sent a 6-digit verification code to
             </p>
-            <p className="text-white font-medium mt-1">+91 {phone}</p>
+            <p className="text-emerald-400 font-medium mt-1 break-all">{email}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* OTP Inputs */}
+            {/* 6-Digit OTP Box Grid */}
             <div className="flex justify-center gap-2 sm:gap-4">
               {otp.map((digit, index) => (
                 <input
@@ -91,7 +91,7 @@ const Otp = ({
               ))}
             </div>
 
-            {/* Verify Button */}
+            {/* Submission Action */}
             <button
               type="submit"
               disabled={loading || otp.join('').length !== 6}
@@ -103,7 +103,7 @@ const Otp = ({
             </button>
           </form>
 
-          {/* Resend Option */}
+          {/* Resend Action Links */}
           <div className="text-center">
             <button
               onClick={onResend}

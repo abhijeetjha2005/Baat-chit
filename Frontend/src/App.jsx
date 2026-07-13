@@ -5,6 +5,7 @@ import SignUp from './pages/SignUp'
 import Otp from './components/Otp'
 import Chat from './pages/Chat'
 
+
 const App = () => {
   return (
     <div className="App"> 

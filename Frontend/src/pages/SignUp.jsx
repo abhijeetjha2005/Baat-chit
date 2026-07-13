@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import { motion } from 'framer-motion';
+import axios from "axios"
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -45,17 +46,20 @@ const SignUp = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
+      const response =await axios.post(  "http://localhost:3000/api/auth/register",
+          {
+      name: formData.fullName,
+      email: formData.email,
+      password: formData.password,
+      confirmPassword: formData.confirmPassword,
+    },{
+         withCredentials: true, 
+    }
 
-      const data = await response.json();
+      )
+
+      const data = response.data;
+      
 
       if (data.success) {
         alert("🎉 Account created successfully!");
@@ -64,7 +68,7 @@ const SignUp = () => {
         setError(data.message || "Failed to create account");
       }
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError(err.response?.data?.message ||"Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
