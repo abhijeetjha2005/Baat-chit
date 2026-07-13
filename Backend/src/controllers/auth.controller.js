@@ -87,12 +87,45 @@ console.log(
 
 const registerUser = async (req, res) => {
   try {
-    let { name, email, password, confirmPassword } = req.body;
+    let { name, email, password, confirmPassword,otp } = req.body;
     
     // Validation
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !password || !confirmPassword ||!otp) {
       return res.status(400).json({ success: false, message: "All fields are required" }); 
     }
+
+name = name.trim();
+email = email.trim().toLowerCase();    
+
+    // Find OTP for this email
+const otpRecord = await OTP.findOne({ email });
+
+if (!otpRecord) {
+  return res.status(400).json({
+    success: false,
+    message: "OTP not found"
+  });
+}
+
+// Check if OTP has expired
+if (otpRecord.expiresAt < new Date()) {
+  return res.status(400).json({
+    success: false,
+    message: "OTP has expired"
+  });
+}
+
+// Check if OTP matches
+if (otpRecord.otp !== otp) {
+  return res.status(400).json({
+    success: false,
+    message: "Invalid OTP"
+  });
+}
+
+// OTP is correct, remove it
+await OTP.deleteOne({ email });
+
     if (password !== confirmPassword) {
       return res.status(400).json({ success: false, message: "Passwords do not match" });
     }
