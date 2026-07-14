@@ -7,6 +7,11 @@ const Otp = ({ onResend }) => {
   const location = useLocation();
 
   const formData = location.state || {};
+  useEffect(() => {
+  if (!location.state) {
+    navigate("/signup");
+  }
+}, []);
 
   const [loading, setLoading] = useState(false);
   const [otp, setOtp] = useState(new Array(6).fill(""));

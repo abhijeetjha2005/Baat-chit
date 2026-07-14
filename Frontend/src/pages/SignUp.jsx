@@ -63,7 +63,9 @@ const SignUp = () => {
 
       if (data.success) {
         alert("🎉 Account created successfully!");
-        navigate('/otp');
+        navigate('/otp',{
+            state: formData,
+        });
       } else {
         setError(data.message || "Failed to create account");
       }
