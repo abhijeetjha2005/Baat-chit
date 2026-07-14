@@ -110,6 +110,17 @@ if (response.data.message === "Login successful") {
            {loading ? "Signing In..." : "Sign In"}
             </button>
           </form>
+{/* forget password */}
+<div className="text-right">
+  <button
+    type="button"
+    onClick={() => navigate("/forgot-password")}
+    className="text-sm text-emerald-400 hover:text-emerald-500 hover:underline transition"
+  >
+    Forgot Password?
+  </button>
+</div>
+
 
           {/* Sign Up Link */}
           <div className="mt-8 text-sm text-zinc-400">
