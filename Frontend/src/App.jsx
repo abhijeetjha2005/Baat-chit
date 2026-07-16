@@ -5,6 +5,7 @@ import SignUp from './pages/SignUp'
 import Otp from './components/Otp'
 import Chat from './pages/Chat'
 import Forgot from'./components/Forgot'
+import ResetPass from './pages/ResetPass'
 
 
 const App = () => {
@@ -16,8 +17,10 @@ const App = () => {
     <Route path="/signup" element={<SignUp />} />
     <Route path="/otp" element={<Otp />} />
     <Route path="/chat" element={<Chat />} />
-    <Route path="forgot-password"
+    <Route path="/forgot-password"
     element={<Forgot />} />
+    <Route path="/reset-password"
+    element={<ResetPass/>} />
   </Routes>
  </Router>
     </div>
