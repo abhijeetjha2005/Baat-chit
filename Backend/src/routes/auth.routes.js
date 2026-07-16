@@ -6,7 +6,9 @@ const { loginLimiter } = require('../middleware/auth.middleware');
 const { 
   sendOtp, 
   registerUser, 
-  login 
+  login ,
+  forgotPassword,
+  resetPassword
 } = require('../controllers/auth.controller');
 
 // Import middleware (if you have it)
@@ -15,5 +17,7 @@ const {
 router.post('/send-otp', sendOtp);           // Send OTP
 router.post('/register', registerUser);      // Register with OTP verification
 router.post('/login', loginLimiter, login);  // Login with rate limiting
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
 module.exports = router;
