@@ -106,8 +106,43 @@ const ResetPass = () => {
                            focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
               />
             </div>
+            {error && (
+              <p className="text-red-500 text-sm text-center font-medium bg-red-950/30 py-2 rounded-xl border border-red-900/50">
+                {error}
+              </p>
+            )}
+            {successMessage && (
+              <p className="text-emerald-400 text-sm text-center font-medium bg-emerald-950/30 py-2 rounded-xl border border-emerald-900/50">
+               {successMessage} <br />
+               <span className="text-xs text-zinc-400">Redirecting to Sign In...</span>
+              </p>
+            )}
+       <button
+       type="submit"
+       disabled={loading || !!successMessage}
+       className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 
+                         disabled:opacity-50 text-white font-semibold rounded-2xl transition-all duration-200 text-base"
+            >
+       
+        {loading ? "Updating Password..." : "Reset Password"}
+       </button>
+
           </form>
+          <div className="mt-6 pt-6 border-t border-zinc-800 text-center">
+            <button
+            onClick={()=> navigate("/")}
+            className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition">
+         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+         </svg>
+         Back to Sign In
+            </button>
+          </div>
         </div>
+        <p className="text-xs text-zinc-500 mt-8">
+           Secure • Private • Instant
+        </p>
       </div>
     </div>
   );
