@@ -1,22 +1,39 @@
 import React, { useState, useEffect } from "react";
 import Ai from "../components/Ai";
 
-const Friends = ({ searchTerm }) => {
+const Friends = ({ searchTerm="",onChatSelect, selectedChat }) => {
   const [friendsList, setFriendList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const socketRef=useRef(null);
 
-  useEffect(() => {
-    const fetchedUsers = []
+useEffect(()=>{
+  // 1. Establish a native WebSocket bridge connection straight to your backend port
+  const socketUrl="ws://localhost:3000"
+  console.log(`Attempting to connect to backend socket at: ${socketUrl}`);
 
-    setFriendList(fetchedUsers);
+  const ws = new WebSocket(socketUrl)
+  socketRef.current=ws;
+  // 2. CONNECTION OPEN: Triggered when the browser successfully shakes hands with Node.js
+  ws.onopen=()=>{
+    console.log("Connected to backend successfully!");
     setLoading(false);
-  }, []);
+    // Ask backend to fetch your authenticated contact profile items
+    ws.send(JSON.stringify({
+      type: "fetch_contacts_list",
+        userId: "current_logged_in_user_id"
+    }))
 
-  // Filter friends based on search term (from Chatleft)
-  const filteredFriends = friendsList.filter((friend) =>
-    friend.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    friend.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  }
+  // 3. MESSAGE RECEIVED: Triggered when the backend pushes data down the pipe
+  ws.onmessage=(event)=>{
+   try{
+
+   }catch(err){
+    
+   } 
+  }
+
+})
 
   if (loading) {
     return (
