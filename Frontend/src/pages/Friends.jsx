@@ -6,22 +6,7 @@ const Friends = ({ searchTerm }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchedUsers = [
-      {
-        id: "u1",
-        name: "Sarah Connor",
-        email: "sarah@gmail.com",
-        phone: "+123456",
-        status: "Online",
-      },
-      {
-        id: "u2",
-        name: "John Doe",
-        email: "john@gmail.com",
-        phone: "+987654",
-        status: "Offline",
-      },
-    ];
+    const fetchedUsers = []
 
     setFriendList(fetchedUsers);
     setLoading(false);
