@@ -7,7 +7,7 @@ require("dotenv").config();
 
 const connectDb = require("./src/config/db");
 const app = require("./src/app");
-const setupWebSocket = require("./websocket");
+const setupWebSocket = require("./src/config/websocket");
 
 // Connect to MongoDB
 connectDb();

@@ -7,22 +7,22 @@ const ChatLeft = ({ onChatSelect, selectedChat, showBackButton = false }) => {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <div className="h-full flex flex-col bg-zinc-900">
+    <div className="h-full w-full flex flex-col bg-zinc-900">
       <div className="flex-1 flex flex-col bg-zinc-800 rounded-2xl md:rounded-3xl border border-zinc-700 shadow-xl overflow-hidden">
         
         {/* Header */}
         <div className="p-3 sm:p-4 border-b border-zinc-700 flex items-center gap-3">
-          {/* Back Button (Mobile Only) */}
+          {/* Back Button (Mobile Only - now switches perfectly at md breakpoint) */}
           {showBackButton && (
             <button 
               onClick={() => onChatSelect && onChatSelect(null)}
-              className="lg:hidden p-2 hover:bg-zinc-700 rounded-xl text-zinc-400 -ml-1 transition-colors"
+              className="md:hidden p-2 hover:bg-zinc-700 rounded-xl text-zinc-400 -ml-1 transition-colors"
             >
               <ArrowLeft size={24} />
             </button>
           )}
 
-          <h2 className="text-lg font-semibold text-white">Chats</h2>
+          <h2 className="text-lg font-semibold text-white shrink-0">Chats</h2>
           
           <div className="relative flex-1">
             <input
