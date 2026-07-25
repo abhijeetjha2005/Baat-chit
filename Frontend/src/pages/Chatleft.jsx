@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
 import Friends from '../pages/Friends';
-import { Search, ArrowLeft } from 'lucide-react';
+import { Search, ArrowLeft, X } from 'lucide-react';
 
 const ChatLeft = ({ onChatSelect, selectedChat, showBackButton = false }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+
+  // Triggered when user clicks the search icon or presses Enter
+  const handleSearch = (e) => {
+    if (e) e.preventDefault();
+    console.log("Searching for:", searchTerm);
+    // Any extra search trigger logic can go here
+  };
+
+  // Clear search field
+  const handleClear = () => {
+    setSearchTerm("");
+  };
 
   return (
     <div className="h-full w-full flex flex-col bg-zinc-900">
@@ -12,7 +24,7 @@ const ChatLeft = ({ onChatSelect, selectedChat, showBackButton = false }) => {
         
         {/* Header */}
         <div className="p-3 sm:p-4 border-b border-zinc-700 flex items-center gap-3">
-          {/* Back Button (Mobile Only - now switches perfectly at md breakpoint) */}
+          {/* Back Button (Mobile) */}
           {showBackButton && (
             <button 
               onClick={() => onChatSelect && onChatSelect(null)}
@@ -24,7 +36,7 @@ const ChatLeft = ({ onChatSelect, selectedChat, showBackButton = false }) => {
 
           <h2 className="text-lg font-semibold text-white shrink-0">Chats</h2>
           
-          <div className="relative flex-1">
+          <form onSubmit={handleSearch} className="relative flex-1">
             <input
               type="text"
               placeholder="Search friends..."
@@ -38,15 +50,31 @@ const ChatLeft = ({ onChatSelect, selectedChat, showBackButton = false }) => {
                          focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             />
 
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-              <Search
-                size={20}
-                className={`text-zinc-400 transition-all duration-300 ${
-                  isFocused ? "text-emerald-400 scale-110" : ""
-                }`}
-              />
+            {/* Clear Button (Shown when typing) or Search Button */}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="p-1 text-zinc-500 hover:text-zinc-300 rounded-lg transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              )}
+
+              <button
+                type="submit"
+                className="p-1 text-zinc-400 hover:text-emerald-400 transition-all duration-300 focus:outline-none"
+              >
+                <Search
+                  size={20}
+                  className={`${
+                    isFocused || searchTerm ? "text-emerald-400 scale-110" : "text-zinc-400"
+                  }`}
+                />
+              </button>
             </div>
-          </div>
+          </form>
         </div>
 
         {/* Friends List */}

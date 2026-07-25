@@ -1,35 +1,56 @@
-const WebSocket=require('ws')
+const WebSocket = require("ws");
+const mongoose = require("mongoose");
+const User = require("../models/user.model"); // Ensure path matches your structure
 
+const setupWebSocket = (server) => {
+  const wss = new WebSocket.Server({ server });
 
-const setupWebSocket=(server)=>{
+  console.log("WebSocket Server Started");
 
-  const wss=new WebSocket.Server({server})
+  wss.on("connection", (ws) => {
+    console.log("New user connected via WebSocket");
 
-  console.log("webSocket Server Started");
+    ws.on("message", async (message) => {
+      try {
+        const data = JSON.parse(message);
 
-  wss.on('connection',(ws)=>{
-    console.log("New user connected");
-    ws.on('message',(message)=>{
-      try{
-           const data =JSON.parse(message);
-           wss.clients.forEach(client=>{
-            if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data));
-          }
-           })
+        // Fetch contacts list
+        if (data.type === "fetch_contacts_list") {
+          const currentUserId = data.userId;
 
-      }catch(err){
-        console.log("Invalid message");
-        
+          // 2. Safely check if currentUserId is a valid MongoDB ObjectId
+          const isValidId = currentUserId && mongoose.Types.ObjectId.isValid(currentUserId);  
+
+         
+          // Only exclude the user if a valid ID was passed
+          const query = isValidId ? { _id: { $ne: currentUserId } } : {};
+          
+          const users = await User.find(query, "-password");
+
+          ws.send(
+            JSON.stringify({
+              type: "contacts_list_add",
+              users,
+            })
+          );
+        }
+      } catch (err) {
+        console.error("WebSocket message processing error:", err.message);
+
+        // Send fallback empty array so frontend stops loading
+        ws.send(
+          JSON.stringify({
+            type: "contacts_list_add",
+            users: [],
+          })
+        );
       }
-    })
-    ws.on('close',()=>{
-      console.log("User disconnected");
-      
-    })
-    
-  })
-  
-}
+    });
 
-module.exports=setupWebSocket;
+    ws.on("close", () => {
+      console.log("User disconnected");
+    });
+  });
+};
+
+module.exports = setupWebSocket;
