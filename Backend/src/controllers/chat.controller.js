@@ -189,3 +189,38 @@ if (!conversation.isGroup && !isParticipant) {
 res.status(500).json({ message: "Server Error", error: error.message });
   }
 }
+
+exports.getConversation=async(req,res)=>{
+  try{
+    // Logged in user
+      const userId=req.user.id;
+  // Find all conversations where the logged-in user is a participant
+    const conversation=await Conversation.find({
+      participants :userId
+    })
+    // Get participant details instead of only ObjectIds
+    .popoulate("participants","name email")
+      // Get last message details
+      .populate({
+        path: "lastMessage",
+        populate: {
+          path: "sender",
+          select: "name email",
+        },
+      })
+         // Latest conversation first
+      .sort({ updatedAt: -1 });
+        return res.status(200).json({
+      success: true,
+      conversations,
+    });
+ 
+  }catch(error){
+  return res.status(500).json
+({
+ success:false,
+ message:"server error",
+ error:error.message
+}) 
+ }
+}
