@@ -1,9 +1,53 @@
-import React, { useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import Chatleft from "./Chatleft";
 import Chatright from "./Chatright";
 
 const Chat = () => {
   const [selectedChat, setSelectedChat] = useState(null);
+
+const [socket, setSocket] = useState(null);
+
+useEffect(() => {
+  const ws = new WebSocket("ws://localhost:3000");
+
+  ws.onopen = () => {
+    console.log("WebSocket Connected");
+
+  const user = JSON.parse(localStorage.getItem("user"));
+  console.log("FULL USER:", user);
+
+ const userId =
+  user?._id ||
+  user?.id ||
+  user?.user?._id ||
+  user?.user?.id;
+  
+  console.log("FINAL USER ID", userId);
+
+    if (userId) {
+      ws.send(
+        JSON.stringify({
+          type: "register",
+          userId: userId,
+        })
+      );
+    }
+
+
+    setSocket(ws);
+  };
+    ws.onmessage = (event) => {
+    console.log("WS message:", event.data);
+  };
+  ws.onclose = () => {
+    console.log("WebSocket disconnected");
+  };
+
+  return () => {
+    ws.close();
+  };
+}, []);
+
 
   const handleChatSelect = (chat) => {
     setSelectedChat(chat);
@@ -23,7 +67,8 @@ const Chat = () => {
         <div className={`w-full md:w-80 lg:w-96 md:border-r border-zinc-700/60 flex-shrink-0
                         ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
           <Chatleft 
-            onChatSelect={handleChatSelect} 
+            socket={socket}
+            onChatSelect={setSelectedChat} 
             selectedChat={selectedChat}
             // Set this to true! On mobile (under md), the back button will hide/show correctly.
             showBackButton={!!selectedChat}
@@ -36,8 +81,9 @@ const Chat = () => {
           
           {selectedChat ? (
             <Chatright 
-              profileName={selectedChat.name} 
-              profilePic={selectedChat.avatar} 
+              socket={socket}
+              selectedChat={selectedChat} 
+             
               onBack={handleBackToList}
             />
           ) : (

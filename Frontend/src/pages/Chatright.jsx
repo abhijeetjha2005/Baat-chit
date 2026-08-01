@@ -1,22 +1,42 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Send, Camera, Mic, FolderOpen, Edit2, MoreVertical, ArrowLeft } from 'lucide-react';
+import {
+  Send,
+  Camera,
+  Mic,
+  FolderOpen,
+  Edit2,
+  MoreVertical,
+  ArrowLeft,
+} from "lucide-react";
 
-const ChatRight = ({ profileName = "Alex Rivera", profilePic: initialPic, onBack }) => {
+const ChatRight = ({ socket, selectedChat, onBack }) => {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const profileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  const [message, setMessage] = useState('');
-  const [profilePic, setProfilePic] = useState(initialPic || "https://picsum.photos/id/64/200/200");
-  
-  // 1. Message State Management
-  const [messages, setMessages] = useState([
-    { id: 1, text: "Hey! Did you check out the new design updates?", sender: "them", time: "10:14 AM" },
-    { id: 2, text: "Yeah, looks super clean! Love the dark accents.", sender: "me", time: "10:15 AM" }
-  ]);
+  const [message, setMessage] = useState("");
+  const [conversationId, setConversationId] = useState(null);
+  const currentUser = JSON.parse(localStorage.getItem("user"));
+const currentUserId = currentUser?._id || currentUser?.id; 
 
+
+  // Who is selected
+  //  Their name
+  //  Their avatar
+  //  Their ID
+
+  const profileName = selectedChat?.name || "Unkown user";
+  const profilePic =
+    selectedChat?.avatar ||
+    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(profileName)}`;
+
+  const receiverId = selectedChat?._id;
+  console.log("Receiver ID:", selectedChat?._id);
+
+  // 1. Message State Management
+  const [messages, setMessages] = useState([]);
   // 2. Auto-grow Textarea Height Effect
   useEffect(() => {
     if (textareaRef.current) {
@@ -34,47 +54,111 @@ const ChatRight = ({ profileName = "Alex Rivera", profilePic: initialPic, onBack
     scrollToBottom();
   }, [messages]);
 
+  // receiving message
+useEffect(() => {
+  if (!socket || !selectedChat || !currentUserId) return;
+
+  const handleMessage = (event) => {
+    const data = JSON.parse(event.data);
+
+   console.log("ChatRight received:", data);
+console.log("My ID:", currentUserId);
+console.log("Receiver ID in message:", data.receiverId);
+
+      if (
+    data.type === "receive_message" &&
+    data.receiverId?.toString() === currentUserId?.toString()
+  )
+
+    {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          text: data.text,
+          sender: "friend",
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      ]);
+    }
+  };
+
+  socket.addEventListener("message", handleMessage);
+
+  return () => {
+    socket.removeEventListener("message", handleMessage);
+  };
+}, [socket, selectedChat, currentUserId]);
+
   const handleFolderClick = () => fileInputRef.current?.click();
   const handleCameraClick = () => cameraInputRef.current?.click();
 
   const handleFileChange = (e) => {
     const files = e.target.files;
     if (files?.length > 0) console.log("Files selected:", files);
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const handleProfilePicChange = (e) => {
     const file = e.target.files?.[0];
+
     if (file) {
       if (!file.type.startsWith("image/")) {
         alert("Please upload an image file");
         return;
       }
-      setProfilePic(URL.createObjectURL(file));
-      console.log("✅ Profile picture updated");
     }
-    e.target.value = '';
+
+    const handleProfilePicChange = (e) => {
+      console.log("Profile picture upload will be implemented later.");
+    };
+
+    e.target.value = "";
   };
 
-  const handleSend = () => {
-    if (message.trim()) {
-      const now = new Date();
-      const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      
-      const newMessage = {
-        id: Date.now(),
-        text: message.trim(),
-        sender: "me",
-        time: formattedTime
-      };
+ const handleSend = () => {
 
-      setMessages((prev) => [...prev, newMessage]);
-      setMessage('');
-    }
+  console.log("Send clicked");
+  console.log("socket:", socket);
+  console.log("selectedChat:", selectedChat);
+
+  if (!message.trim() || !selectedChat || !socket) return;
+
+  const currentUser = JSON.parse(localStorage.getItem("user"));
+  const senderId = currentUser?._id || currentUser?.id;
+
+  const payload = {
+    type: "send_message",
+    senderId: senderId,
+    receiverId: selectedChat._id,
+    text: message.trim(),
   };
+
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(payload));
+  }else {
+  console.log("Socket is not open", socket.readyState);
+}
+
+  const newMessage = {
+    id: Date.now(),
+    text: message.trim(),
+    sender: "me",
+    time: new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
+
+  setMessages((prev) => [...prev, newMessage]);
+  setMessage("");
+};
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -89,7 +173,7 @@ const ChatRight = ({ profileName = "Alex Rivera", profilePic: initialPic, onBack
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-700 bg-zinc-800 shrink-0">
         {/* Back Button - Visible only on mobile */}
-        <button 
+        <button
           onClick={onBack}
           className="lg:hidden p-2 hover:bg-zinc-700 rounded-xl text-zinc-400"
         >
@@ -100,21 +184,30 @@ const ChatRight = ({ profileName = "Alex Rivera", profilePic: initialPic, onBack
           className="relative w-10 h-10 rounded-full overflow-hidden border border-zinc-600 cursor-pointer group shrink-0"
           onClick={() => profileInputRef.current?.click()}
         >
-          <img src={profilePic} alt="Profile" className="w-full h-full object-cover" />
+          <img
+            src={profilePic}
+            alt="Profile"
+            className="w-full h-full object-cover"
+          />
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
             <Edit2 size={18} className="text-white" />
           </div>
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="text-zinc-100 font-medium truncate">{profileName}</div>
+          <div className="text-zinc-100 font-medium truncate">
+            {profileName}
+          </div>
           <div className="text-emerald-500 text-sm flex items-center gap-1.5">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
             Online
           </div>
         </div>
 
-        <button onClick={handleMoreClick} className="p-2 hover:bg-zinc-700 rounded-xl text-zinc-400">
+        <button
+          onClick={handleMoreClick}
+          className="p-2 hover:bg-zinc-700 rounded-xl text-zinc-400"
+        >
           <MoreVertical size={22} />
         </button>
       </div>
@@ -128,22 +221,25 @@ const ChatRight = ({ profileName = "Alex Rivera", profilePic: initialPic, onBack
         ) : (
           messages.map((msg) => {
             const isMe = msg.sender === "me";
+
             return (
-              <div 
-                key={msg.id} 
-                className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}
+              <div
+                key={msg.id}
+                className={`flex w-full ${isMe ? "justify-end" : "justify-start"}`}
               >
-                <div 
+                <div
                   className={`max-w-[75%], md:max-w-[60%] rounded-2xl px-4 py-2 text-[15px] shadow-md relative tracking-wide leading-relaxed break-words whitespace-pre-wrap pb-5 ${
-                    isMe 
-                      ? 'bg-emerald-600 text-white rounded-tr-none' 
-                      : 'bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-none'
+                    isMe
+                      ? "bg-emerald-600 text-white rounded-tr-none"
+                      : "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-none"
                   }`}
                 >
                   {msg.text}
-                  <span className={`absolute bottom-0.5 right-3 text-[10px] select-none ${
-                    isMe ? 'text-emerald-200' : 'text-zinc-500'
-                  }`}>
+                  <span
+                    className={`absolute bottom-0.5 right-3 text-[10px] select-none ${
+                      isMe ? "text-emerald-200" : "text-zinc-500"
+                    }`}
+                  >
                     {msg.time}
                   </span>
                 </div>
@@ -158,19 +254,49 @@ const ChatRight = ({ profileName = "Alex Rivera", profilePic: initialPic, onBack
       {/* Input Area */}
       <div className="p-3 bg-zinc-900 border-t border-zinc-700 shrink-0">
         <div className="w-full bg-zinc-800 rounded-3xl border border-zinc-700 shadow-lg p-3">
-          <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileChange} />
-          <input type="file" ref={cameraInputRef} className="hidden" accept="image/*,video/*" capture="environment" onChange={handleFileChange} />
-          <input type="file" ref={profileInputRef} className="hidden" accept="image/*" onChange={handleProfilePicChange} />
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            multiple
+            onChange={handleFileChange}
+          />
+          <input
+            type="file"
+            ref={cameraInputRef}
+            className="hidden"
+            accept="image/*,video/*"
+            capture="environment"
+            onChange={handleFileChange}
+          />
+          <input
+            type="file"
+            ref={profileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={handleProfilePicChange}
+          />
 
           <div className="flex items-end gap-3 bg-zinc-900 rounded-2xl border border-zinc-700/50 focus-within:border-emerald-500 p-3">
             <div className="flex gap-1 text-zinc-400">
-              <button onClick={handleFolderClick} className="p-3 hover:bg-zinc-800 rounded-xl" title="Attach">
+              <button
+                onClick={handleFolderClick}
+                className="p-3 hover:bg-zinc-800 rounded-xl"
+                title="Attach"
+              >
                 <FolderOpen size={26} />
               </button>
-              <button onClick={handleCameraClick} className="p-3 hover:bg-zinc-800 rounded-xl hidden xs:block" title="Camera">
+              <button
+                onClick={handleCameraClick}
+                className="p-3 hover:bg-zinc-800 rounded-xl hidden xs:block"
+                title="Camera"
+              >
                 <Camera size={26} />
               </button>
-              <button className="p-3 hover:bg-zinc-800 rounded-xl" title="Voice">
+              <button
+                className="p-3 hover:bg-zinc-800 rounded-xl"
+                title="Voice"
+              >
                 <Mic size={26} />
               </button>
             </div>

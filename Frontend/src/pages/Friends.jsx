@@ -1,90 +1,103 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Ai from "../components/Ai";
 
-const Friends = ({ searchTerm = "", onChatSelect, selectedChat }) => {
+const Friends = ({ socket, searchTerm = "", onChatSelect, selectedChat }) => {
+  console.log("Friends search:", searchTerm);
   const [friendsList, setFriendList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const socketRef = useRef(null);
 
+  // Retrieve actual user ID from localStorage
+  const storedUser = localStorage.getItem("user");
+  const currentUser = storedUser ? JSON.parse(storedUser) : null;
+  const actualUserId = currentUser?._id || currentUser?.id;
+
+  // Listen to incoming WebSocket messages safely
   useEffect(() => {
-    // 1. Establish a native WebSocket bridge connection straight to your backend port
-    const socketUrl = "ws://localhost:3000";
-    console.log(`Attempting to connect to backend socket at: ${socketUrl}`);
+    if (!socket) return;
 
-    const ws = new WebSocket(socketUrl);
-    socketRef.current = ws;
-
-    // 2. CONNECTION OPEN
-    ws.onopen = () => {
-      console.log("Connected to backend successfully!");
+    // Fetch contacts when socket is ready or already open
+    const fetchContacts = () => {
       setLoading(false);
-      
-      // Request initial contacts list
-      ws.send(
-        JSON.stringify({
-          type: "fetch_contacts_list",
-          userId: "current_logged_in_user_id",
-        })
-      );
-    };
-
-    // 3. MESSAGE RECEIVED
-  ws.onmessage = (event) => {
-  try {
-    const incomingPayload = JSON.parse(event.data);
-
-    // Initial contacts list
-    if (incomingPayload.type === "contacts_list_add") {
-      setFriendList(incomingPayload.users || []);
-    }
-
-    // 🟢 Real-time Online/Offline Status Update
-    if (incomingPayload.type === "user_status_change") {
-      setFriendList((prevFriends) =>
-        prevFriends.map((friend) =>
-          friend._id === incomingPayload.userId
-            ? { ...friend, status: incomingPayload.status }
-            : friend
-        )
-      );
-    }
-  } catch (err) {
-    console.error("Error parsing socket payload message frame:", err);
-  }
-} ;
-    // 4. CONNECTION ERROR/CLOSE
-    ws.onerror = (err) => {
-      console.error("WebSocket connection error occurred:", err);
-    };
-    
-    ws.onclose = () => {
-      console.warn("WebSocket connection closed by host network layer.");
-    };
-
-    // CLEANUP
-    return () => {
-      if (ws) { 
-        ws.close();
+      if (socket.readyState === WebSocket.OPEN && actualUserId) {
+        socket.send(
+          JSON.stringify({
+            type: "fetch_contacts_list",
+            userId: actualUserId,
+          })
+        );
       }
     };
-  }, []);
 
-  // Send search query to socket backend whenever user explicitly triggers search
+    if (socket.readyState === WebSocket.OPEN) {
+      fetchContacts();
+    } else {
+      socket.addEventListener("open", fetchContacts);
+    }
+
+    // Message event handler
+    const handleMessage = (event) => {
+      try {
+        const incomingPayload = JSON.parse(event.data);
+
+        switch (incomingPayload.type) {
+          // Initial contacts list or search results
+          case "contacts_list_add":
+          case "search_results":
+             console.log("Received in frontend:", incomingPayload.users);
+            setFriendList(incomingPayload.users || []);
+            setLoading(false);
+            break;
+
+          // Real-time Online/Offline Status Update
+          case "user_status_change":
+            setFriendList((prevFriends) =>
+              prevFriends.map((friend) =>
+                friend._id === incomingPayload.userId
+                  ? { ...friend, status: incomingPayload.status }
+                  : friend
+              )
+            );
+            break;
+
+         
+
+          default:
+            break;
+        }
+      } catch (err) {
+        console.error("Error parsing WebSocket message frame:", err);
+      }
+    };
+
+    socket.addEventListener("message", handleMessage);
+
+    // CLEANUP: Detach event listeners without closing the shared socket connection
+    return () => {
+      socket.removeEventListener("open", fetchContacts);
+      socket.removeEventListener("message", handleMessage);
+    };
+  }, [socket, actualUserId]);
+
+  // Send search query to socket backend on search input
   useEffect(() => {
-    if (searchTerm.trim() && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(
+     console.log("Search changed:", searchTerm);
+    if (searchTerm.trim() && socket && socket.readyState === WebSocket.OPEN) {
+       console.log("Sending search request");
+      socket.send(
         JSON.stringify({
           type: "search_users",
           query: searchTerm,
         })
       );
     }
-  }, [searchTerm]);
+  }, [searchTerm, socket]);
 
-  // Local filter fallback for fast instant typing feedback
+  
+  // Local search filter fallback
   const filteredFriends = friendsList.filter((friend) => {
-    const nameMatch = friend.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const emailMatch = friend.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const nameMatch = friend.name?.toLowerCase().includes(term);
+    const emailMatch = friend.email?.toLowerCase().includes(term);
     return nameMatch || emailMatch;
   });
 
@@ -103,14 +116,15 @@ const Friends = ({ searchTerm = "", onChatSelect, selectedChat }) => {
         {filteredFriends.length > 0 ? (
           filteredFriends.map((friend) => {
             const isSelected = selectedChat?._id === friend._id;
+            const isOnline = friend.status?.toLowerCase() === "online";
 
             return (
               <div
-                key={friend._id}
+                key={friend._id || friend.id}
                 onClick={() => onChatSelect && onChatSelect(friend)}
                 className={`flex items-center gap-3 p-3 rounded-2xl transition cursor-pointer ${
-                  isSelected 
-                    ? "bg-zinc-700/80 border border-emerald-500/30" 
+                  isSelected
+                    ? "bg-zinc-700/80 border border-emerald-500/30"
                     : "hover:bg-zinc-800/70 active:bg-zinc-800"
                 }`}
               >
@@ -119,14 +133,12 @@ const Friends = ({ searchTerm = "", onChatSelect, selectedChat }) => {
                     src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
                       friend.name || "User"
                     )}`}
-                    alt={friend.name}
+                    alt={friend.name || "User"}
                     className="w-12 h-12 rounded-full bg-zinc-700"
                   />
                   <span
                     className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-zinc-900 ${
-                      friend.status === "Online"
-                        ? "bg-emerald-500"
-                        : "bg-zinc-500"
+                      isOnline ? "bg-emerald-500" : "bg-zinc-500"
                     }`}
                   />
                 </div>
@@ -147,8 +159,11 @@ const Friends = ({ searchTerm = "", onChatSelect, selectedChat }) => {
         )}
       </div>
 
+     
+   
+
       {/* Floating AI Button */}
-      <div className="absolute bottom-6 right-6 z-10">
+      <div className="absolute bottom-1 right-6 z-10">
         <Ai />
       </div>
     </div>
