@@ -34,7 +34,17 @@ email:formData.email,
 password:formData.password,
   }
 )
+console.log("LOGIN RESPONSE:", response.data);
 if (response.data.message === "Login successful") {
+  localStorage.setItem(
+    "user",
+    JSON.stringify(response.data.user)
+  )
+   localStorage.setItem(
+    "token",
+    response.data.token
+  );
+
       navigate("/chat");
 }
   }catch(error){

@@ -14,6 +14,7 @@ const setupWebSocket = (server) => {
     console.log("New user connected via WebSocket");
 
     ws.on("message", async (message) => {
+       console.log("RAW MESSAGE:", message.toString());
       try {
         const data = JSON.parse(message);
 

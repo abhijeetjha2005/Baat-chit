@@ -24,13 +24,18 @@ useEffect(() => {
   
   console.log("FINAL USER ID", userId);
 
+  
     if (userId) {
-      ws.send(
-        JSON.stringify({
-          type: "register",
-          userId: userId,
-        })
-      );
+     const registerPayload={
+      type:"register",
+      userId,
+     }
+     console.log("Sending register:",registerPayload);
+     ws.send(JSON.stringify(registerPayload));
+     
+    }else{
+      console.log("no user found");
+      
     }
 
 
