@@ -4,6 +4,9 @@ const Message = require('../models/message.model');
 
 // 1. Get or Create Conversation + Load Messages personal chat
 exports.getOrCreateConversation=async (req,res)=>{
+    console.log("getOrCreateConversation called");
+  console.log("Sender:", req.user.id);
+  console.log("Receiver:", req.params.receiverId);
   try{
     const senderId=req.user.id;
     const {receiverId}=req.params;
@@ -199,7 +202,7 @@ exports.getConversation=async(req,res)=>{
       participants :userId
     })
     // Get participant details instead of only ObjectIds
-    .popoulate("participants","name email")
+    .populate("participants","name email")
       // Get last message details
       .populate({
         path: "lastMessage",

@@ -44,9 +44,15 @@ useEffect(() => {
     ws.onmessage = (event) => {
     console.log("WS message:", event.data);
   };
-  ws.onclose = () => {
-    console.log("WebSocket disconnected");
-  };
+  ws.onclose = (event) => {
+     console.log("WebSocket disconnected");
+  console.log("Code:", event.code);
+  console.log("Reason:", event.reason);
+  console.log("Was clean:", event.wasClean);
+  }
+  ws.onerror=(error)=>{
+     console.error("WebSocket error:", error);
+  }
 
   return () => {
     ws.close();

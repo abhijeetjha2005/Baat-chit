@@ -1,6 +1,8 @@
 const WebSocket = require("ws");
 const mongoose = require("mongoose");
 const User = require("../models/user.model"); // Ensure path matches your structure
+const Message=require("../models/message.model")
+const Conversation=require("../models/conversation.model")
 
 const setupWebSocket = (server) => {
   const wss = new WebSocket.Server({ server });
@@ -79,37 +81,91 @@ if(data.type==="search_users"){
   return
 }
 
-        // --- NEW: HANDLE CHAT MESSAGES ---
-       if (data.type === "send_message") {
+// FETCH OLD CHAT MESSAGES
+if(data.type === "fetch_messages"){
+
+    console.log("FETCH MESSAGE REQUEST:", data);
+
+    const {senderId, receiverId} = data;
+
+
+    const conversation = await Conversation.findOne({
+        participants:{
+            $all:[senderId, receiverId]
+        },
+        isGroup:false
+    });
+
+
+    if(!conversation){
+        ws.send(JSON.stringify({
+            type:"old_messages",
+            messages:[]
+        }));
+        return;
+    }
+
+
+    const messages = await Message.find({
+        conversationId: conversation._id
+    }).sort({createdAt:1});
+
+
+    console.log("FOUND MESSAGES:", messages);
+
+
+    ws.send(JSON.stringify({
+        type:"old_messages",
+        messages
+    }));
+
+    return;
+}
+        // --- NEW: HANDLE CHAT MESSAGES  and store it---
+if (data.type === "send_message") {
 
   console.log("SEND MESSAGE:", data);
 
   const { senderId, receiverId, text } = data;
 
-  console.log(
-    "Receiver socket:",
-    activeUsers.get(receiverId?.toString())
-  );
+let conversation=await Conversation.findOne({
+  participants :{$all :[senderId,receiverId]},
+  isGroup:false
+})
+if(!conversation){
+  conversation=await Conversation.create({
+    participants:[senderId,receiverId],
+    isGroup:false
+  })
+}
+
+  // Save message in MongoDB
+  const savedMessage =await Message.create({
+ conversationId:conversation._id,
+ sender: senderId,
+ text,
+  });
+conversation.lastMessage = savedMessage._id;
+await conversation.save();
 
   const messageData = {
     type: "receive_message",
-    senderId,
-    receiverId,
-    text,
-    createdAt: new Date().toISOString()
+    message: savedMessage
   };
 
+
   const receiverSocket = activeUsers.get(receiverId?.toString());
+
 
   if (receiverSocket && receiverSocket.readyState === WebSocket.OPEN) {
     receiverSocket.send(JSON.stringify(messageData));
   }
 
+
   ws.send(JSON.stringify(messageData));
 
   return;
 }
-
       } catch (err) {
         console.error("WebSocket message processing error:", err.message);
 

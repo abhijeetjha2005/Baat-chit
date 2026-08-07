@@ -1,4 +1,10 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Send,
   Camera,
@@ -17,146 +23,223 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
   const messagesEndRef = useRef(null);
 
   const [message, setMessage] = useState("");
-  const [conversationId, setConversationId] = useState(null);
-  const currentUser = JSON.parse(localStorage.getItem("user"));
-const currentUserId = currentUser?._id || currentUser?.id; 
-
-
-  // Who is selected
-  //  Their name
-  //  Their avatar
-  //  Their ID
-
-  const profileName = selectedChat?.name || "Unkown user";
-  const profilePic =
-    selectedChat?.avatar ||
-    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(profileName)}`;
-
-  const receiverId = selectedChat?._id;
-  console.log("Receiver ID:", selectedChat?._id);
-
-  // 1. Message State Management
   const [messages, setMessages] = useState([]);
-  // 2. Auto-grow Textarea Height Effect
+  const [showMenu,setShowMenu] = useState(false);
+
+  // 1. Get logged-in user and normalize ID
+  const currentUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user")) || {};
+    } catch (e) {
+      console.error("Failed to parse user from localStorage", e);
+      return {};
+    }
+  }, []);
+
+  const currentUserId = (currentUser?._id || currentUser?.id)?.toString();
+
+  // 2. Extract Receiver ID cleanly (handles all object variations)
+  const receiverId = (
+    selectedChat?._id ||
+    selectedChat?.id ||
+    selectedChat?.user?._id
+  )?.toString();
+
+  const profileName =
+    selectedChat?.name || selectedChat?.user?.name || "Unknown user";
+  const profilePic =
+    selectedChat?.profilePic ||
+    selectedChat?.avatar ||
+    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
+      profileName,
+    )}`;
+
+  console.log("ChatRight Active Context:", {
+    currentUserId,
+    receiverId,
+    profileName,
+  });
+
+  // Auto-scroll helper
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+  }, []);
+
+  // 3. Fetch Message History on active chat change
+  useEffect(() => {
+    if (!socket || !receiverId || !currentUserId) {
+      return;
+    }
+
+    const payload = {
+      type: "fetch_messages",
+      senderId: currentUserId,
+      receiverId: receiverId,
+    };
+
+    console.log("fetching old messages:", payload);
+
+    socket.send(JSON.stringify(payload));
+  }, [socket, selectedChat]);
+  // 4. Auto-scroll when messages update
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // 5. Auto-grow Textarea Height
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "auto"; // Reset height
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`; // Set to content height
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [message]);
 
-  // 3. Auto-scroll to Bottom Effect
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // 6. Listen for incoming Real-Time WebSocket Messages
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (!socket || !receiverId) return;
 
-  // receiving message
-useEffect(() => {
-  if (!socket || !selectedChat || !currentUserId) return;
+    const handleMessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("ChatRight received WS event:", data);
+        if (data.type === "old_messages") {
+          const formattedMessages = data.messages.map((msg) => {
+            const senderId = (msg.sender?._id || msg.sender).toString();
 
-  const handleMessage = (event) => {
-    const data = JSON.parse(event.data);
+            return {
+              id: msg._id,
+              text: msg.text,
+              sender: senderId === currentUserId ? "me" : "friend",
 
-   console.log("ChatRight received:", data);
-console.log("My ID:", currentUserId);
-console.log("Receiver ID in message:", data.receiverId);
+              time: new Date(msg.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            };
+          });
 
-      if (
-    data.type === "receive_message" &&
-    data.receiverId?.toString() === currentUserId?.toString()
-  )
+          setMessages(formattedMessages);
+          return;
+        }
+        // Match typical real-time message types
+        if (
+          data.type === "receive_message" ||
+          data.type === "send_message" ||
+          data.type === "new_message" ||
+          data.type === "message"
+        ) {
+          const msg = data.message || data;
+          const msgSenderId = (
+            msg.senderId ||
+            msg.sender?._id ||
+            msg.sender
+          )?.toString();
 
-    {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          text: data.text,
-          sender: "friend",
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
-    }
-  };
-
-  socket.addEventListener("message", handleMessage);
-
-  return () => {
-    socket.removeEventListener("message", handleMessage);
-  };
-}, [socket, selectedChat, currentUserId]);
-
-  const handleFolderClick = () => fileInputRef.current?.click();
-  const handleCameraClick = () => cameraInputRef.current?.click();
-
-  const handleFileChange = (e) => {
-    const files = e.target.files;
-    if (files?.length > 0) console.log("Files selected:", files);
-    e.target.value = "";
-  };
-
-  const handleProfilePicChange = (e) => {
-    const file = e.target.files?.[0];
-
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        alert("Please upload an image file");
-        return;
+          // Only append if the message is from the user we are currently chatting with
+          if (msgSenderId === receiverId) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: msg._id || Date.now(),
+                text: msg.text || msg.content || "",
+                sender: "friend",
+                time: new Date(msg.createdAt || Date.now()).toLocaleTimeString(
+                  [],
+                  {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  },
+                ),
+              },
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error("Error parsing WebSocket message:", err);
       }
-    }
-
-    const handleProfilePicChange = (e) => {
-      console.log("Profile picture upload will be implemented later.");
     };
 
-    e.target.value = "";
-  };
+    socket.addEventListener("message", handleMessage);
 
- const handleSend = () => {
+    return () => {
+      socket.removeEventListener("message", handleMessage);
+    };
+  }, [socket, receiverId]);
 
-  console.log("Send clicked");
-  console.log("socket:", socket);
-  console.log("selectedChat:", selectedChat);
+  // 7. Handle Sending Messages
+  const handleSend = () => {
+    if (!message.trim()) return;
 
-  if (!message.trim() || !selectedChat || !socket) return;
+    if (!receiverId) {
+      console.error("Cannot send message: No selected user receiver ID found!");
+      alert("Please select a user to send a message.");
+      return;
+    }
 
-  const currentUser = JSON.parse(localStorage.getItem("user"));
-  const senderId = currentUser?._id || currentUser?.id;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      console.error(
+        "Cannot send message: WebSocket is not open!",
+        socket?.readyState,
+      );
+      alert("WebSocket connection is disconnected.");
+      return;
+    }
 
-  const payload = {
-    type: "send_message",
-    senderId: senderId,
-    receiverId: selectedChat._id,
-    text: message.trim(),
-  };
+    const trimmedText = message.trim();
 
-  if (socket.readyState === WebSocket.OPEN) {
+    const payload = {
+      type: "send_message",
+      senderId: currentUserId,
+      receiverId: receiverId,
+      text: trimmedText,
+    };
+
+    console.log("Sending message WS payload:", payload);
     socket.send(JSON.stringify(payload));
-  }else {
-  console.log("Socket is not open", socket.readyState);
-}
 
-  const newMessage = {
-    id: Date.now(),
-    text: message.trim(),
-    sender: "me",
-    time: new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    // Optimistic local state update
+    const newMessage = {
+      id: Date.now(),
+      text: trimmedText,
+      sender: "me",
+      time: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+    setMessage("");
   };
+  // delete logic
+  const handleDelete =async()=>{
+    try{
+    const conversationId=selectedChat?.conversationId;
+    if (!conversationId) {
+      console.log("No conversation id found");
+      return;
+    }
+    const res=await fetch(`/api/chat/conversation/${conversationId}`,{
+      method:"DELETE",
+      header:{
+        Authorisation:`Bearer ${localStorage.getItem("token")}`,
+      }
+    })
+    const data =await res.json();
+    console.log(data);
+    if(res.ok){
+      setMessage([])
+      setShowMenu(false);
+    }
+    
 
-  setMessages((prev) => [...prev, newMessage]);
-  setMessage("");
-};
-
+    }catch(error){
+      console.log("Delete error",error);
+      
+    }
+  }
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -164,15 +247,10 @@ console.log("Receiver ID in message:", data.receiverId);
     }
   };
 
-  const handleMoreClick = () => {
-    console.log("More options clicked");
-  };
-
   return (
     <div className="h-full flex flex-col bg-zinc-900">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-700 bg-zinc-800 shrink-0">
-        {/* Back Button - Visible only on mobile */}
         <button
           onClick={onBack}
           className="lg:hidden p-2 hover:bg-zinc-700 rounded-xl text-zinc-400"
@@ -203,18 +281,37 @@ console.log("Receiver ID in message:", data.receiverId);
             Online
           </div>
         </div>
+{/* deletion */}
+      <div className="relative">
+   <button
+    onClick={()=>
+      setShowMenu((prev)=>!prev)
+    }
+    className="p-2 hover:bg-zinc-700 rounded-xl text-zinc-400"
+   >
+    <MoreVertical size={22}/>
 
-        <button
-          onClick={handleMoreClick}
-          className="p-2 hover:bg-zinc-700 rounded-xl text-zinc-400"
-        >
-          <MoreVertical size={22} />
-        </button>
+   </button>
+   {showMenu&&(
+    <div className="absolute right-0 top-12 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg w-40 z-50">
+      <button 
+       onClick={handleDelete}
+        className="w-full text-left px-4 py-3 text-red-400 hover:bg-zinc-700 rounded-lg">
+  Delete Chat
+      </button>
+    </div>
+   )}
+
+      </div>
       </div>
 
-      {/* Chat Content */}
+      {/* Messages Display */}
       <div className="flex-1 overflow-y-auto p-4 bg-zinc-900 space-y-3">
-        {messages.length === 0 ? (
+        {!receiverId ? (
+          <div className="h-full flex items-center justify-center text-zinc-500 text-sm">
+            Select a contact to start chatting
+          </div>
+        ) : messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-zinc-500 text-sm">
             Start of conversation with {profileName}
           </div>
@@ -225,10 +322,12 @@ console.log("Receiver ID in message:", data.receiverId);
             return (
               <div
                 key={msg.id}
-                className={`flex w-full ${isMe ? "justify-end" : "justify-start"}`}
+                className={`flex w-full ${
+                  isMe ? "justify-end" : "justify-start"
+                }`}
               >
                 <div
-                  className={`max-w-[75%], md:max-w-[60%] rounded-2xl px-4 py-2 text-[15px] shadow-md relative tracking-wide leading-relaxed break-words whitespace-pre-wrap pb-5 ${
+                  className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-4 py-2 text-[15px] shadow-md relative tracking-wide leading-relaxed break-words whitespace-pre-wrap pb-5 ${
                     isMe
                       ? "bg-emerald-600 text-white rounded-tr-none"
                       : "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-none"
@@ -247,47 +346,37 @@ console.log("Receiver ID in message:", data.receiverId);
             );
           })
         )}
-        {/* Invisible anchor tag for scrolling */}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
       <div className="p-3 bg-zinc-900 border-t border-zinc-700 shrink-0">
         <div className="w-full bg-zinc-800 rounded-3xl border border-zinc-700 shadow-lg p-3">
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            multiple
-            onChange={handleFileChange}
-          />
+          <input type="file" ref={fileInputRef} className="hidden" multiple />
           <input
             type="file"
             ref={cameraInputRef}
             className="hidden"
-            accept="image/*,video/*"
-            capture="environment"
-            onChange={handleFileChange}
+            accept="image/*"
           />
           <input
             type="file"
             ref={profileInputRef}
             className="hidden"
             accept="image/*"
-            onChange={handleProfilePicChange}
           />
 
           <div className="flex items-end gap-3 bg-zinc-900 rounded-2xl border border-zinc-700/50 focus-within:border-emerald-500 p-3">
             <div className="flex gap-1 text-zinc-400">
               <button
-                onClick={handleFolderClick}
+                onClick={() => fileInputRef.current?.click()}
                 className="p-3 hover:bg-zinc-800 rounded-xl"
                 title="Attach"
               >
                 <FolderOpen size={26} />
               </button>
               <button
-                onClick={handleCameraClick}
+                onClick={() => cameraInputRef.current?.click()}
                 className="p-3 hover:bg-zinc-800 rounded-xl hidden xs:block"
                 title="Camera"
               >
