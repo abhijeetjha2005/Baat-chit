@@ -25,7 +25,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [showMenu,setShowMenu] = useState(false);
-
+  const [activeConversationId, setActiveConversationId] = useState(null);
   // 1. Get logged-in user and normalize ID
   const currentUser = useMemo(() => {
     try {
@@ -105,6 +105,11 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
         const data = JSON.parse(event.data);
         console.log("ChatRight received WS event:", data);
         if (data.type === "old_messages") {
+   
+          if(data.conversationId){
+           setActiveConversationId(data.conversationId)
+          }
+ 
           const formattedMessages = data.messages.map((msg) => {
             const senderId = (msg.sender?._id || msg.sender).toString();
 
@@ -122,13 +127,12 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
 
           setMessages(formattedMessages);
           return;
+
         }
+        
         // Match typical real-time message types
         if (
-          data.type === "receive_message" ||
-          data.type === "send_message" ||
-          data.type === "new_message" ||
-          data.type === "message"
+          data.type === "receive_message"
         ) {
           const msg = data.message || data;
           const msgSenderId = (
@@ -156,6 +160,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
             ]);
           }
         }
+
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
       }
@@ -214,32 +219,46 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
     setMessage("");
   };
   // delete logic
-  const handleDelete =async()=>{
-    try{
-    const conversationId=selectedChat?.conversationId;
-    if (!conversationId) {
-      console.log("No conversation id found");
-      return;
-    }
-    const res=await fetch(`/api/chat/conversation/${conversationId}`,{
-      method:"DELETE",
-      header:{
-        Authorisation:`Bearer ${localStorage.getItem("token")}`,
+ const handleDelete = async () => {
+  const conversationId = activeConversationId;
+
+  if (!conversationId) {
+    console.log("No conversation id found");
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    console.log("TOKEN EXISTS:", !!token);
+    console.log("CONVERSATION ID:", conversationId);
+
+    const res = await fetch(
+      `http://localhost:3000/api/chat/conversation/${conversationId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       }
-    })
-    const data =await res.json();
-    console.log(data);
-    if(res.ok){
-      setMessage([])
+    );
+
+    const data = await res.json();
+
+    console.log("DELETE STATUS:", res.status);
+    console.log("DELETE RESPONSE:", data);
+
+    if (res.ok) {
+      setMessages([]);
+      setActiveConversationId(null);
       setShowMenu(false);
     }
-    
 
-    }catch(error){
-      console.log("Delete error",error);
-      
-    }
+  } catch (error) {
+    console.log("Delete error:", error);
   }
+};
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -284,9 +303,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
 {/* deletion */}
       <div className="relative">
    <button
-    onClick={()=>
-      setShowMenu((prev)=>!prev)
-    }
+    onClick={()=>setShowMenu((prev)=>!prev)}
     className="p-2 hover:bg-zinc-700 rounded-xl text-zinc-400"
    >
     <MoreVertical size={22}/>
@@ -298,6 +315,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
        onClick={handleDelete}
         className="w-full text-left px-4 py-3 text-red-400 hover:bg-zinc-700 rounded-lg">
   Delete Chat
+  
       </button>
     </div>
    )}

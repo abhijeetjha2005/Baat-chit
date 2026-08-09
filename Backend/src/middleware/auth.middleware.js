@@ -5,21 +5,30 @@ const jwt = require("jsonwebtoken");
 // token
 const auth =(req,res,next)=>{
   try{
-    const token= req.cookies?.token;
+    const authHeader = req.headers.authorization;
+      console.log("AUTH HEADER:", authHeader);
 
-      if (!token) {
+      if (!authHeader||!authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         message: "Access denied. No token provided."
       });
     }
+    const token = authHeader.split(" ")[1];
+       console.log("TOKEN:", token);
+    console.log("JWT SECRET EXISTS:", !!process.env.JWT_SECRET);
       // Verify JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    console.log("DECODED USER:", decoded);
 
        // Make user data available in controllers
     req.user = decoded;
  
     next();
   }catch(error){
+      console.log("JWT ERROR NAME:", error.name);
+    console.log("JWT ERROR MESSAGE:", error.message);
+
         return res.status(401).json({
       message: "Invalid or expired token."
     });

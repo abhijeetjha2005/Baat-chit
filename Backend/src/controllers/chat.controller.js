@@ -31,6 +31,8 @@ if(!conversation){
   })
 }
 
+
+
 // / 3. Fetch all historical messages for this conversation
 
 const messages= await Message.find({
@@ -95,17 +97,22 @@ exports.sendMessage = async (req, res) => {
 
     // Verify sender belongs to this conversation/group
     const conversation = await Conversation.findById(conversationId);
+ if (!conversation) {
+    return res.status(404).json({
+        message: "Conversation not found."
+    });
+}
 
-    const isParticipant = conversation?.participants.some(
-  (id) => id.toString() === senderId
+const isParticipant = conversation.participants.some(
+    id => id.toString() === senderId
 );
 
-
-if (!conversation || !isParticipant) {
-  return res.status(403).json({
-    message: "Unauthorized to post in this chat."
-  });
+if (!isParticipant) {
+    return res.status(403).json({
+        message: "Unauthorized to post in this chat."
+    });
 }
+
     const newMessage = await Message.create({
       conversationId,
       sender: senderId,
@@ -198,7 +205,7 @@ exports.getConversation=async(req,res)=>{
     // Logged in user
       const userId=req.user.id;
   // Find all conversations where the logged-in user is a participant
-    const conversation=await Conversation.find({
+    const conversations=await Conversation.find({
       participants :userId
     })
     // Get participant details instead of only ObjectIds

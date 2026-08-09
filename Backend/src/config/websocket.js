@@ -116,6 +116,7 @@ if(data.type === "fetch_messages"){
 
     ws.send(JSON.stringify({
         type:"old_messages",
+        conversationId:conversation._id,
         messages
     }));
 
@@ -150,6 +151,7 @@ await conversation.save();
 
   const messageData = {
     type: "receive_message",
+     conversationId: conversation._id,
     message: savedMessage
   };
 
