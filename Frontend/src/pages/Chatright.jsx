@@ -14,6 +14,7 @@ import {
   MoreVertical,
   ArrowLeft,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const ChatRight = ({ socket, selectedChat, onBack }) => {
   const fileInputRef = useRef(null);
@@ -21,6 +22,9 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
   const profileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const [isOnline, setIsOnline] = useState(false);
+  const [lastSeen, setLastSeen] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
@@ -118,9 +122,10 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
               text: msg.text,
               sender: senderId === currentUserId ? "me" : "friend",
 
-              time: new Date(msg.createdAt).toLocaleTimeString([], {
+              time: new Date(msg.createdAt ).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
+                hour12:true,
               }),
             };
           });
@@ -129,7 +134,42 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
           return;
 
         }
-        
+     if (data.type === "message_deleted") {
+
+  console.log("MESSAGE DELETED FROM WS:", data.messageId);
+
+  setMessages((prev) =>
+    prev.filter((msg) => msg.id !== data.messageId)
+  );
+
+  return;
+}
+
+if (data.type === "user_status_change") {
+
+  console.log("STATUS EVENT:", {
+    eventUserId: data.userId,
+    receiverId,
+    status: data.status,
+    lastSeen: data.lastSeen,
+  });
+
+  if (data.userId?.toString() === receiverId?.toString()) {
+
+    if (data.status === "online") {
+      setIsOnline(true);
+      setLastSeen(null);
+    }
+
+    if (data.status === "offline") {
+      setIsOnline(false);
+      setLastSeen(data.lastSeen || null);
+    }
+  }
+
+  return;
+}
+
         // Match typical real-time message types
         if (
           data.type === "receive_message"
@@ -142,13 +182,13 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
           )?.toString();
 
           // Only append if the message is from the user we are currently chatting with
-          if (msgSenderId === receiverId) {
+          if (msgSenderId === receiverId|| msgSenderId === currentUserId) {
             setMessages((prev) => [
               ...prev,
               {
-                id: msg._id || Date.now(),
+                id: msg._id,
                 text: msg.text || msg.content || "",
-                sender: "friend",
+                sender:msgSenderId===currentUserId?"me":"friend",
                 time: new Date(msg.createdAt || Date.now()).toLocaleTimeString(
                   [],
                   {
@@ -203,38 +243,23 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
 
     console.log("Sending message WS payload:", payload);
     socket.send(JSON.stringify(payload));
-
-    // Optimistic local state update
-    const newMessage = {
-      id: Date.now(),
-      text: trimmedText,
-      sender: "me",
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
     setMessage("");
+   
   };
   // delete logic
- const handleDelete = async () => {
-  const conversationId = activeConversationId;
+const handleDelete = async (messageId) => {
+  console.log("DELETE MESSAGE ID:", messageId);
 
-  if (!conversationId) {
-    console.log("No conversation id found");
+  if (!messageId) {
+    console.error("Invalid message ID:", messageId);
     return;
   }
 
   try {
     const token = localStorage.getItem("token");
 
-    console.log("TOKEN EXISTS:", !!token);
-    console.log("CONVERSATION ID:", conversationId);
-
     const res = await fetch(
-      `http://localhost:3000/api/chat/conversation/${conversationId}`,
+      `http://localhost:3000/api/chat/message/${messageId}`,
       {
         method: "DELETE",
         headers: {
@@ -250,14 +275,78 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
     console.log("DELETE RESPONSE:", data);
 
     if (res.ok) {
-      setMessages([]);
-      setActiveConversationId(null);
-      setShowMenu(false);
+
+      // Remove from current user's screen
+      setMessages((prev) =>
+        prev.filter((msg) => msg.id !== messageId)
+      );
+
+      // Notify other user through WebSocket
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(
+          JSON.stringify({
+            type: "message_deleted",
+            messageId: messageId,
+            conversationId: activeConversationId
+          })
+        );
+      }
     }
 
   } catch (error) {
-    console.log("Delete error:", error);
+    console.error("Delete message error:", error);
   }
+};
+
+const handleDeleteChat = async () => {
+  if (!activeConversationId) {
+    console.error("No active conversation ID");
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(
+      `http://localhost:3000/api/chat/conversation/${activeConversationId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await res.json();
+
+    console.log("DELETE CHAT STATUS:", res.status);
+    console.log("DELETE CHAT RESPONSE:", data);
+
+    if (res.ok) {
+      setMessages([]);
+      setActiveConversationId(null);
+      setShowMenu(false);
+
+      onBack();
+    } else {
+      console.error("Delete chat failed:", data);
+    }
+  } catch (error) {
+    console.error("Delete chat error:", error);
+  }
+};
+
+const navigate = useNavigate();
+const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+
+   if (socket) {
+    socket.close();
+  }
+
+  navigate("/login");
+  
 };
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -295,10 +384,23 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
           <div className="text-zinc-100 font-medium truncate">
             {profileName}
           </div>
-          <div className="text-emerald-500 text-sm flex items-center gap-1.5">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-            Online
-          </div>
+       <div className="text-sm flex items-center gap-1.5">
+  {isOnline ? (
+    <>
+      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+      <span className="text-emerald-500">Online</span>
+    </>
+  ) : (
+    <span className="text-zinc-500">
+      {lastSeen
+        ? `Last seen ${new Date(lastSeen).toLocaleString([], {
+            dateStyle: "short",
+            timeStyle: "short",
+          })}`
+        : "Offline"}
+    </span>
+  )}
+</div>
         </div>
 {/* deletion */}
       <div className="relative">
@@ -312,11 +414,18 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
    {showMenu&&(
     <div className="absolute right-0 top-12 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg w-40 z-50">
       <button 
-       onClick={handleDelete}
+       onClick={handleDeleteChat}
         className="w-full text-left px-4 py-3 text-red-400 hover:bg-zinc-700 rounded-lg">
-  Delete Chat
-  
+  Delete Chat  
       </button>
+
+        <button
+      onClick={handleLogout}
+      className="w-full text-left px-4 py-3 text-zinc-200 hover:bg-zinc-700 rounded-lg"
+    >
+      Logout
+    </button>
+
     </div>
    )}
 
@@ -345,7 +454,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
                 }`}
               >
                 <div
-                  className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-4 py-2 text-[15px] shadow-md relative tracking-wide leading-relaxed break-words whitespace-pre-wrap pb-5 ${
+                  className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-4 py-2 text-[27px] shadow-md relative tracking-wide leading-relaxed break-words whitespace-pre-wrap pb-5 ${
                     isMe
                       ? "bg-emerald-600 text-white rounded-tr-none"
                       : "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-none"
@@ -353,12 +462,22 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
                 >
                   {msg.text}
                   <span
-                    className={`absolute bottom-0.5 right-3 text-[10px] select-none ${
+                    className={`absolute bottom-0.5 right-1 text-[10px] select-none ${
                       isMe ? "text-emerald-200" : "text-zinc-500"
                     }`}
                   >
                     {msg.time}
                   </span>
+                 {
+                  isMe && (
+                      <button
+                    onClick= {()=>handleDelete(msg.id)}
+                    className="text-red-300 text-xs ml-3"
+                >
+                    Unsend
+                </button>
+                  )
+                 }
                 </div>
               </div>
             );

@@ -60,30 +60,30 @@ res.status(200).json({
 
 // 2. GROUP CHAT: Create Group
 
-exports.createGroup = async (req, res) => {
-  try {
-    const adminId = req.user.id;
-    const { title, participantIds } = req.body; // Array of user IDs
+// exports.createGroup = async (req, res) => {
+//   try {
+//     const adminId = req.user.id;
+//     const { title, participantIds } = req.body; // Array of user IDs
 
-    if (!title || !participantIds || participantIds.length === 0) {
-      return res.status(400).json({ message: "Group title and members are required." });
-    }
+//     if (!title || !participantIds || participantIds.length === 0) {
+//       return res.status(400).json({ message: "Group title and members are required." });
+//     }
 
-    // Ensure the creator is included in the group members array
-    const uniqueParticipants = Array.from(new Set([...participantIds, adminId]));
+//     // Ensure the creator is included in the group members array
+//     const uniqueParticipants = Array.from(new Set([...participantIds, adminId]));
 
-    const group = await Conversation.create({
-      groupTitle: title,
-      participants: uniqueParticipants,
-      isGroup: true,
-      groupAdmin: adminId
-    });
+//     const group = await Conversation.create({
+//       groupTitle: title,
+//       participants: uniqueParticipants,
+//       isGroup: true,
+//       groupAdmin: adminId
+//     });
 
-    res.status(201).json(group);
-  } catch (error) {
-    res.status(500).json({ message: "Server Error", error: error.message });
-  }
-};
+//     res.status(201).json(group);
+//   } catch (error) {
+//     res.status(500).json({ message: "Server Error", error: error.message });
+//   }
+// };
 
 // send messages
 exports.sendMessage = async (req, res) => {
@@ -131,37 +131,68 @@ if (!isParticipant) {
 };
 
 // unsend
-exports.deleteMessage=async(req,res)=>{
-  try{
-    const userId=req.user.id;
-    const {messageId}=req.params;
+exports.deleteMessage = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { messageId } = req.params;
 
-    // Find the message first to verify ownership
-    const message =await Message.findById(messageId)
-    if(!message){
-      return res.status(404).json({message: "Message not found."})
+    const message = await Message.findById(messageId);
 
+    if (!message) {
+      return res.status(404).json({
+        message: "Message not found."
+      });
     }
-    //  Security Check: Only the sender can delete their own message
-if (message.sender.toString() !== userId) {
-      return res.status(403).json({ message: "Unauthorized to delete this message." });
+
+    // Find the conversation containing this message
+    const conversation = await Conversation.findById(message.conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({
+        message: "Conversation not found."
+      });
     }
-    const conversationId = message.conversationId;
-    await Message.findByIdAndDelete(messageId);
 
-    // Optimization: If we deleted the "lastMessage", update the conversation reference
-    const remaininngLastMessage=await Message.findOne({conversationId}).sort({createdAt:-1})
+    // Check that the logged-in user belongs to this conversation
+    const isParticipant = conversation.participants.some(
+      (id) => id.toString() === userId.toString()
+    );
 
-     await Conversation.findByIdAndUpdate(conversationId,{
-      lastMessage:remaininngLastMessage?remaininngLastMessage._id:null
-     })
- res.status(200).json({ message: "Message deleted successfully.", messageId });
+    if (!isParticipant) {
+      return res.status(403).json({
+        message: "Unauthorized to delete this message."
+      });
+    }
 
-  }catch(error){
-res.status(500).json({ message: "Server Error", error: error.message });
+    // Delete message for everyone
+  // Delete message for everyone
+await Message.findByIdAndDelete(messageId);
+
+// Update lastMessage if the deleted message was the last message
+const remainingLastMessage = await Message.findOne({
+  conversationId: message.conversationId
+}).sort({ createdAt: -1 });
+
+await Conversation.findByIdAndUpdate(message.conversationId, {
+  lastMessage: remainingLastMessage
+    ? remainingLastMessage._id
+    : null
+});    
+
+    res.status(200).json({
+      message: "Message deleted successfully.",
+      messageId
+    });
+
+  } catch (error) {
+    console.error("Delete message error:", error);
+
+    res.status(500).json({
+      message: "Server Error",
+      error: error.message
+    });
   }
-}
-
+};
 
 // delete conversation
 exports.deleteConversation=async(req,res)=>{

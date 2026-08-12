@@ -5,7 +5,7 @@ const {auth }= require('../middleware/auth.middleware');
 const  { 
   getOrCreateConversation, 
   getConversation,
-  createGroup,
+  // createGroup,
   sendMessage, 
   deleteMessage, 
   deleteConversation 
@@ -14,7 +14,7 @@ const  {
 router.get('/user/:receiverId', auth, getOrCreateConversation);
 router.get('/conversations', auth, getConversation);
 
-router.post('/group', auth, createGroup);
+// router.post('/group', auth, createGroup);
 
 router.post('/send', auth, sendMessage);
 

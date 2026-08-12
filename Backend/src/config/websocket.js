@@ -21,14 +21,39 @@ const setupWebSocket = (server) => {
         const data = JSON.parse(message);
 
         // --- NEW: Register user connection on connect/auth ---
-        if (data.type === "register") {
-          if (data.userId) {
-            activeUsers.set(data.userId.toString(), ws);
-            ws.userId = data.userId.toString(); // store on socket for cleanup
-            console.log(`User registered on WS: ${data.userId}`);
-          }
-          return;
-        }
+if (data.type === "register") {
+  if (data.userId) {
+    const userId = data.userId.toString();
+
+    activeUsers.set(userId, ws);
+    ws.userId = userId;
+
+    // Mark user online
+    await User.findByIdAndUpdate(userId, {
+      isOnline: true
+    });
+
+    console.log(`User registered on WS: ${userId}`);
+
+    // Notify other connected users
+    for (const [otherUserId, otherSocket] of activeUsers.entries()) {
+      if (
+        otherUserId !== userId &&
+        otherSocket.readyState === WebSocket.OPEN
+      ) {
+        otherSocket.send(
+          JSON.stringify({
+            type: "user_status_change",
+            userId: userId,
+            status: "online"
+          })
+        );
+      }
+    }
+  }
+
+  return;
+}
 
         // --- FETCH CONTACTS LIST ---
         if (data.type === "fetch_contacts_list") {
@@ -82,46 +107,59 @@ if(data.type==="search_users"){
 }
 
 // FETCH OLD CHAT MESSAGES
-if(data.type === "fetch_messages"){
+if (data.type === "fetch_messages") {
 
-    console.log("FETCH MESSAGE REQUEST:", data);
+  console.log("FETCH MESSAGE REQUEST:", data);
 
-    const {senderId, receiverId} = data;
+  const { senderId, receiverId } = data;
 
+  // Send current receiver status immediately
+  const receiver = await User.findById(receiverId)
+    .select("isOnline lastSeen");
 
-    const conversation = await Conversation.findOne({
-        participants:{
-            $all:[senderId, receiverId]
-        },
-        isGroup:false
-    });
+  ws.send(
+    JSON.stringify({
+      type: "user_status_change",
+      userId: receiverId,
+      status: receiver?.isOnline ? "online" : "offline",
+      lastSeen: receiver?.lastSeen || null
+    })
+  );
 
+  const conversation = await Conversation.findOne({
+    participants: {
+      $all: [senderId, receiverId]
+    },
+    isGroup: false
+  });
 
-    if(!conversation){
-        ws.send(JSON.stringify({
-            type:"old_messages",
-            messages:[]
-        }));
-        return;
-    }
-
-
-    const messages = await Message.find({
-        conversationId: conversation._id
-    }).sort({createdAt:1});
-
-
-    console.log("FOUND MESSAGES:", messages);
-
-
-    ws.send(JSON.stringify({
-        type:"old_messages",
-        conversationId:conversation._id,
-        messages
-    }));
-
+  if (!conversation) {
+    ws.send(
+      JSON.stringify({
+        type: "old_messages",
+        messages: []
+      })
+    );
     return;
+  }
+
+  const messages = await Message.find({
+    conversationId: conversation._id,
+  }).sort({ createdAt: 1 });
+
+  console.log("FOUND MESSAGES:", messages);
+
+  ws.send(
+    JSON.stringify({
+      type: "old_messages",
+      conversationId: conversation._id,
+      messages
+    })
+  );
+
+  return;
 }
+
         // --- NEW: HANDLE CHAT MESSAGES  and store it---
 if (data.type === "send_message") {
 
@@ -152,7 +190,13 @@ await conversation.save();
   const messageData = {
     type: "receive_message",
      conversationId: conversation._id,
-    message: savedMessage
+    message: {
+    _id: savedMessage._id,
+    conversationId: savedMessage.conversationId,
+    sender: savedMessage.sender,
+    text: savedMessage.text,
+    createdAt: savedMessage.createdAt
+  }
   };
 
 
@@ -165,6 +209,31 @@ await conversation.save();
 
 
   ws.send(JSON.stringify(messageData));
+
+  return;
+}
+if (data.type === "message_deleted") {
+
+  const { messageId, conversationId } = data;
+
+  console.log("MESSAGE DELETE EVENT:", messageId);
+
+  // Send deletion event to everyone in this conversation
+  for (const [userId, userSocket] of activeUsers.entries()) {
+
+    if (
+      userSocket.readyState === WebSocket.OPEN
+    ) {
+      userSocket.send(
+        JSON.stringify({
+          type: "message_deleted",
+          messageId: messageId,
+          conversationId: conversationId
+        })
+      );
+    }
+
+  }
 
   return;
 }
@@ -181,14 +250,41 @@ await conversation.save();
     });
 
     // Clean up mapping when socket closes
-    ws.on("close", () => {
-      if (ws.userId) {
-        activeUsers.delete(ws.userId);
-        console.log(`User ${ws.userId} disconnected`);
-      } else {
-        console.log("Unregistered user disconnected");
-      }
+ ws.on("close", async () => {
+  if (ws.userId) {
+    const userId = ws.userId;
+
+    activeUsers.delete(userId);
+
+    // Mark user offline and save last seen
+    const lastSeen = new Date();
+
+    await User.findByIdAndUpdate(userId, {
+      isOnline: false,
+      lastSeen: lastSeen,
     });
+
+    // Notify other connected users
+    for (const [otherUserId, otherSocket] of activeUsers.entries()) {
+      if (
+        otherSocket.readyState === WebSocket.OPEN
+      ) {
+        otherSocket.send(
+          JSON.stringify({
+            type: "user_status_change",
+            userId: userId,
+            status: "offline",
+            lastSeen: lastSeen,
+          })
+        );
+      }
+    }
+
+    console.log(`User ${userId} disconnected`);
+  } else {
+    console.log("Unregistered user disconnected");
+  }
+});
   });
 };
 

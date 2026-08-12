@@ -14,6 +14,7 @@ const App = () => {
  <Router>
   <Routes>
     <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<LandingPage />} />
     <Route path="/signup" element={<SignUp />} />
     <Route path="/otp" element={<Otp />} />
     <Route path="/chat" element={<Chat />} />
