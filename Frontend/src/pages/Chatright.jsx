@@ -10,7 +10,6 @@ import {
   Camera,
   Mic,
   FolderOpen,
-  Edit2,
   MoreVertical,
   ArrowLeft,
 } from "lucide-react";
@@ -19,9 +18,9 @@ import { useNavigate } from "react-router-dom";
 const ChatRight = ({ socket, selectedChat, onBack }) => {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
-  const profileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
   const [isOnline, setIsOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -169,6 +168,14 @@ if (data.type === "user_status_change") {
 
   return;
 }
+if (data.type === "typing") {
+
+  if (data.senderId?.toString() === receiverId?.toString()) {
+    setIsTyping(data.isTyping);
+  }
+
+  return;
+}
 
         // Match typical real-time message types
         if (
@@ -212,6 +219,49 @@ if (data.type === "user_status_change") {
       socket.removeEventListener("message", handleMessage);
     };
   }, [socket, receiverId]);
+// typing
+
+const handleTyping = (e) => {
+ console.log("TYPING FUNCTION CALLED:", e.target.value);
+
+  const value = e.target.value;
+
+  setMessage(value);
+
+  if (!socket || socket.readyState !== WebSocket.OPEN || !receiverId) {
+    return;
+  }
+console.log("SENDING TYPING:", {
+  senderId: currentUserId,
+  receiverId: receiverId,
+  isTyping: true,
+  socketState: socket.readyState
+});
+  // Tell receiver that we are typing
+  socket.send(
+    JSON.stringify({
+      type: "typing",
+      senderId: currentUserId,
+      receiverId: receiverId,
+      isTyping: true,
+    })
+  );
+
+  // Clear previous timer
+  clearTimeout(typingTimeoutRef.current);
+
+  // After 1 second of no typing
+  typingTimeoutRef.current = setTimeout(() => {
+    socket.send(
+      JSON.stringify({
+        type: "typing",
+        senderId: currentUserId,
+        receiverId: receiverId,
+        isTyping: false,
+      })
+    );
+  }, 1000);
+};
 
   // 7. Handle Sending Messages
   const handleSend = () => {
@@ -366,26 +416,24 @@ const handleLogout = () => {
           <ArrowLeft size={24} />
         </button>
 
-        <div
-          className="relative w-10 h-10 rounded-full overflow-hidden border border-zinc-600 cursor-pointer group shrink-0"
-          onClick={() => profileInputRef.current?.click()}
-        >
-          <img
-            src={profilePic}
-            alt="Profile"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-            <Edit2 size={18} className="text-white" />
-          </div>
-        </div>
+       
+       <div className="relative w-10 h-10 rounded-full overflow-hidden border border-zinc-600 shrink-0">
+  <img
+    src={profilePic}
+    alt="Profile"
+    className="w-full h-full object-cover"
+  />
+</div>
+   
 
         <div className="flex-1 min-w-0">
           <div className="text-zinc-100 font-medium truncate">
             {profileName}
           </div>
        <div className="text-sm flex items-center gap-1.5">
-  {isOnline ? (
+  {isTyping ? (
+  <span className="text-emerald-400">Typing...</span>
+) :isOnline ? (
     <>
       <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
       <span className="text-emerald-500">Online</span>
@@ -496,12 +544,7 @@ const handleLogout = () => {
             className="hidden"
             accept="image/*"
           />
-          <input
-            type="file"
-            ref={profileInputRef}
-            className="hidden"
-            accept="image/*"
-          />
+
 
           <div className="flex items-end gap-3 bg-zinc-900 rounded-2xl border border-zinc-700/50 focus-within:border-emerald-500 p-3">
             <div className="flex gap-1 text-zinc-400">
@@ -530,7 +573,10 @@ const handleLogout = () => {
             <textarea
               ref={textareaRef}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e)=>{
+                  console.log("TEXTAREA CHANGE:", e.target.value);
+    handleTyping(e);
+              }}
               onKeyDown={handleKeyDown}
               rows="1"
               placeholder="Type a message..."

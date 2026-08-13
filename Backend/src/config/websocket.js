@@ -159,7 +159,27 @@ if (data.type === "fetch_messages") {
 
   return;
 }
-
+  if(data.type==="typing"){
+    const {senderId,receiverId,isTyping}=data;
+    console.log("Typing Event" ,{
+      senderId,
+      receiverId,
+      isTyping}
+    );
+    
+    const receiverSocket=activeUsers.get(receiverId?.toString());
+    if(receiverSocket && receiverSocket.readyState===WebSocket.OPEN){
+      receiverSocket.send(
+        JSON.stringify({
+            type: "typing",
+        senderId: senderId,
+        isTyping: isTyping
+        })
+      )
+       
+    }
+    return;
+  }
         // --- NEW: HANDLE CHAT MESSAGES  and store it---
 if (data.type === "send_message") {
 
@@ -249,6 +269,10 @@ if (data.type === "message_deleted") {
       }
     });
 
+
+    ws.on("error", (error) => {
+  console.error("WebSocket ERROR:", error);
+});
     // Clean up mapping when socket closes
  ws.on("close", async () => {
   if (ws.userId) {
