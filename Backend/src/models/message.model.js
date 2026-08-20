@@ -13,8 +13,17 @@ const messageSchema=new mongoose.Schema({
   },
   text:{
 type:String ,
-required:true,
-trim:true
+trim:true,
+default:null
+  },
+  messageType:{
+    type:String,
+    enum:["text","voice"],
+    default:"text",
+  },
+  audioUrl:{
+type:String,
+default:null
   },
   deletedFor:[{
     type:mongoose.Schema.Types.ObjectId,

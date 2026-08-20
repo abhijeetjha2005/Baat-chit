@@ -7,7 +7,7 @@ connectDb = async ()=>{
     
   }catch(error){
     console.error('error',error);
-    process.exit(1);
+    throw error;
   }
 }
 module.exports = connectDb;

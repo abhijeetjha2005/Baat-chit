@@ -27,8 +27,15 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const [showMenu,setShowMenu] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordedAudio, setRecordedAudio] = useState(null);
   // 1. Get logged-in user and normalize ID
   const currentUser = useMemo(() => {
     try {
@@ -108,11 +115,10 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
         const data = JSON.parse(event.data);
         console.log("ChatRight received WS event:", data);
         if (data.type === "old_messages") {
-   
-          if(data.conversationId){
-           setActiveConversationId(data.conversationId)
+          if (data.conversationId) {
+            setActiveConversationId(data.conversationId);
           }
- 
+
           const formattedMessages = data.messages.map((msg) => {
             const senderId = (msg.sender?._id || msg.sender).toString();
 
@@ -121,66 +127,59 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
               text: msg.text,
               sender: senderId === currentUserId ? "me" : "friend",
 
-              time: new Date(msg.createdAt ).toLocaleTimeString([], {
+              time: new Date(msg.createdAt).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
-                hour12:true,
+                hour12: true,
               }),
             };
           });
 
           setMessages(formattedMessages);
           return;
-
         }
-     if (data.type === "message_deleted") {
+        if (data.type === "message_deleted") {
+          console.log("MESSAGE DELETED FROM WS:", data.messageId);
 
-  console.log("MESSAGE DELETED FROM WS:", data.messageId);
+          setMessages((prev) =>
+            prev.filter((msg) => msg.id !== data.messageId),
+          );
 
-  setMessages((prev) =>
-    prev.filter((msg) => msg.id !== data.messageId)
-  );
+          return;
+        }
 
-  return;
-}
+        if (data.type === "user_status_change") {
+          console.log("STATUS EVENT:", {
+            eventUserId: data.userId,
+            receiverId,
+            status: data.status,
+            lastSeen: data.lastSeen,
+          });
 
-if (data.type === "user_status_change") {
+          if (data.userId?.toString() === receiverId?.toString()) {
+            if (data.status === "online") {
+              setIsOnline(true);
+              setLastSeen(null);
+            }
 
-  console.log("STATUS EVENT:", {
-    eventUserId: data.userId,
-    receiverId,
-    status: data.status,
-    lastSeen: data.lastSeen,
-  });
+            if (data.status === "offline") {
+              setIsOnline(false);
+              setLastSeen(data.lastSeen || null);
+            }
+          }
 
-  if (data.userId?.toString() === receiverId?.toString()) {
+          return;
+        }
+        if (data.type === "typing") {
+          if (data.senderId?.toString() === receiverId?.toString()) {
+            setIsTyping(data.isTyping);
+          }
 
-    if (data.status === "online") {
-      setIsOnline(true);
-      setLastSeen(null);
-    }
-
-    if (data.status === "offline") {
-      setIsOnline(false);
-      setLastSeen(data.lastSeen || null);
-    }
-  }
-
-  return;
-}
-if (data.type === "typing") {
-
-  if (data.senderId?.toString() === receiverId?.toString()) {
-    setIsTyping(data.isTyping);
-  }
-
-  return;
-}
+          return;
+        }
 
         // Match typical real-time message types
-        if (
-          data.type === "receive_message"
-        ) {
+        if (data.type === "receive_message") {
           const msg = data.message || data;
           const msgSenderId = (
             msg.senderId ||
@@ -189,13 +188,15 @@ if (data.type === "typing") {
           )?.toString();
 
           // Only append if the message is from the user we are currently chatting with
-          if (msgSenderId === receiverId|| msgSenderId === currentUserId) {
+          if (msgSenderId === receiverId || msgSenderId === currentUserId) {
             setMessages((prev) => [
               ...prev,
               {
                 id: msg._id,
                 text: msg.text || msg.content || "",
-                sender:msgSenderId===currentUserId?"me":"friend",
+                audioUrl: msg.audioUrl,
+                type: msg.type || "text",
+                sender: msgSenderId === currentUserId ? "me" : "friend",
                 time: new Date(msg.createdAt || Date.now()).toLocaleTimeString(
                   [],
                   {
@@ -207,7 +208,6 @@ if (data.type === "typing") {
             ]);
           }
         }
-
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
       }
@@ -219,190 +219,294 @@ if (data.type === "typing") {
       socket.removeEventListener("message", handleMessage);
     };
   }, [socket, receiverId]);
-// typing
 
-const handleTyping = (e) => {
- console.log("TYPING FUNCTION CALLED:", e.target.value);
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
 
-  const value = e.target.value;
+      const recorder = new MediaRecorder(stream);
 
-  setMessage(value);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
 
-  if (!socket || socket.readyState !== WebSocket.OPEN || !receiverId) {
-    return;
-  }
-console.log("SENDING TYPING:", {
-  senderId: currentUserId,
-  receiverId: receiverId,
-  isTyping: true,
-  socketState: socket.readyState
-});
-  // Tell receiver that we are typing
-  socket.send(
-    JSON.stringify({
-      type: "typing",
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        setRecordedAudio(audioUrl);
+
+        // Stop microphone
+        stream.getTracks().forEach((track) => track.stop());
+
+        // Stop timer
+        clearInterval(recordingTimerRef.current);
+      };
+
+      recorder.start();
+
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error("Microphone error:", error);
+
+      alert("Cannot access microphone. Please allow microphone permission.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const deleteRecordedAudio = () => {
+    if (recordedAudio) {
+      URL.revokeObjectURL(recordedAudio);
+    }
+
+    setRecordedAudio(null);
+    setRecordingTime(0);
+  };
+  // typing
+
+  const handleTyping = (e) => {
+    console.log("TYPING FUNCTION CALLED:", e.target.value);
+
+    const value = e.target.value;
+
+    setMessage(value);
+
+    if (!socket || socket.readyState !== WebSocket.OPEN || !receiverId) {
+      return;
+    }
+    console.log("SENDING TYPING:", {
       senderId: currentUserId,
       receiverId: receiverId,
       isTyping: true,
-    })
-  );
-
-  // Clear previous timer
-  clearTimeout(typingTimeoutRef.current);
-
-  // After 1 second of no typing
-  typingTimeoutRef.current = setTimeout(() => {
+      socketState: socket.readyState,
+    });
+    // Tell receiver that we are typing
     socket.send(
       JSON.stringify({
         type: "typing",
         senderId: currentUserId,
         receiverId: receiverId,
-        isTyping: false,
-      })
+        isTyping: true,
+      }),
     );
-  }, 1000);
-};
+
+    // Clear previous timer
+    clearTimeout(typingTimeoutRef.current);
+
+    // After 1 second of no typing
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.send(
+        JSON.stringify({
+          type: "typing",
+          senderId: currentUserId,
+          receiverId: receiverId,
+          isTyping: false,
+        }),
+      );
+    }, 1000);
+  };
 
   // 7. Handle Sending Messages
-  const handleSend = () => {
-    if (!message.trim()) return;
-
+  const handleSend = async () => {
     if (!receiverId) {
-      console.error("Cannot send message: No selected user receiver ID found!");
-      alert("Please select a user to send a message.");
+      alert("Please select a user.");
       return;
     }
 
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-      console.error(
-        "Cannot send message: WebSocket is not open!",
-        socket?.readyState,
-      );
       alert("WebSocket connection is disconnected.");
       return;
     }
 
-    const trimmedText = message.trim();
+    // AUDIO MESSAGE
+    // AUDIO MESSAGE
+if (recordedAudio) {
+  try {
+    console.log("Sending audio:", recordedAudio);
+
+    const response = await fetch(recordedAudio);
+    const audioBlob = await response.blob();
+
+    // Create a local URL for displaying the audio
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    // Show audio in chat immediately
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        type: "audio",
+        audioUrl: audioUrl,
+        sender: "me",
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      },
+    ]);
+
+    // Now send the audio to backend
+    const audioBuffer = await audioBlob.arrayBuffer();
+
+    socket.send(audioBuffer);
+
+    console.log("Audio sent!");
+
+    URL.revokeObjectURL(recordedAudio);
+    setRecordedAudio(null);
+    setRecordingTime(0);
+
+    return;
+  } catch (error) {
+    console.error("Audio sending error:", error);
+  }
+}
+ 
+    // TEXT MESSAGE
+    if (!message.trim()) return;
 
     const payload = {
       type: "send_message",
       senderId: currentUserId,
       receiverId: receiverId,
-      text: trimmedText,
+      text: message.trim(),
     };
 
-    console.log("Sending message WS payload:", payload);
     socket.send(JSON.stringify(payload));
+
     setMessage("");
-   
   };
   // delete logic
-const handleDelete = async (messageId) => {
-  console.log("DELETE MESSAGE ID:", messageId);
+  const handleDelete = async (messageId) => {
+    console.log("DELETE MESSAGE ID:", messageId);
 
-  if (!messageId) {
-    console.error("Invalid message ID:", messageId);
-    return;
-  }
+    if (!messageId) {
+      console.error("Invalid message ID:", messageId);
+      return;
+    }
 
-  try {
-    const token = localStorage.getItem("token");
+    try {
+      const token = localStorage.getItem("token");
 
-    const res = await fetch(
-      `http://localhost:3000/api/chat/message/${messageId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const res = await fetch(
+        `http://localhost:3000/api/chat/message/${messageId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         },
-      }
-    );
-
-    const data = await res.json();
-
-    console.log("DELETE STATUS:", res.status);
-    console.log("DELETE RESPONSE:", data);
-
-    if (res.ok) {
-
-      // Remove from current user's screen
-      setMessages((prev) =>
-        prev.filter((msg) => msg.id !== messageId)
       );
 
-      // Notify other user through WebSocket
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(
-          JSON.stringify({
-            type: "message_deleted",
-            messageId: messageId,
-            conversationId: activeConversationId
-          })
-        );
+      const data = await res.json();
+
+      console.log("DELETE STATUS:", res.status);
+      console.log("DELETE RESPONSE:", data);
+
+      if (res.ok) {
+        // Remove from current user's screen
+        setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+
+        // Notify other user through WebSocket
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(
+            JSON.stringify({
+              type: "message_deleted",
+              messageId: messageId,
+              conversationId: activeConversationId,
+            }),
+          );
+        }
       }
+    } catch (error) {
+      console.error("Delete message error:", error);
+    }
+  };
+
+  const handleDeleteChat = async () => {
+    if (!activeConversationId) {
+      console.error("No active conversation ID");
+      return;
     }
 
-  } catch (error) {
-    console.error("Delete message error:", error);
-  }
-};
+    try {
+      const token = localStorage.getItem("token");
 
-const handleDeleteChat = async () => {
-  if (!activeConversationId) {
-    console.error("No active conversation ID");
-    return;
-  }
-
-  try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(
-      `http://localhost:3000/api/chat/conversation/${activeConversationId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `http://localhost:3000/api/chat/conversation/${activeConversationId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
+      );
+
+      const data = await res.json();
+
+      console.log("DELETE CHAT STATUS:", res.status);
+      console.log("DELETE CHAT RESPONSE:", data);
+
+      if (res.ok) {
+        setMessages([]);
+        setActiveConversationId(null);
+        setShowMenu(false);
+
+        onBack();
+      } else {
+        console.error("Delete chat failed:", data);
       }
-    );
-
-    const data = await res.json();
-
-    console.log("DELETE CHAT STATUS:", res.status);
-    console.log("DELETE CHAT RESPONSE:", data);
-
-    if (res.ok) {
-      setMessages([]);
-      setActiveConversationId(null);
-      setShowMenu(false);
-
-      onBack();
-    } else {
-      console.error("Delete chat failed:", data);
+    } catch (error) {
+      console.error("Delete chat error:", error);
     }
-  } catch (error) {
-    console.error("Delete chat error:", error);
-  }
-};
+  };
 
-const navigate = useNavigate();
-const handleLogout = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
 
-   if (socket) {
-    socket.close();
-  }
+    if (socket) {
+      socket.close();
+    }
 
-  navigate("/login");
-  
-};
+    navigate("/login");
+  };
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  // timer for recording
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -416,68 +520,64 @@ const handleLogout = () => {
           <ArrowLeft size={24} />
         </button>
 
-       
-       <div className="relative w-10 h-10 rounded-full overflow-hidden border border-zinc-600 shrink-0">
-  <img
-    src={profilePic}
-    alt="Profile"
-    className="w-full h-full object-cover"
-  />
-</div>
-   
+        <div className="relative w-10 h-10 rounded-full overflow-hidden border border-zinc-600 shrink-0">
+          <img
+            src={profilePic}
+            alt="Profile"
+            className="w-full h-full object-cover"
+          />
+        </div>
 
         <div className="flex-1 min-w-0">
           <div className="text-zinc-100 font-medium truncate">
             {profileName}
           </div>
-       <div className="text-sm flex items-center gap-1.5">
-  {isTyping ? (
-  <span className="text-emerald-400">Typing...</span>
-) :isOnline ? (
-    <>
-      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-      <span className="text-emerald-500">Online</span>
-    </>
-  ) : (
-    <span className="text-zinc-500">
-      {lastSeen
-        ? `Last seen ${new Date(lastSeen).toLocaleString([], {
-            dateStyle: "short",
-            timeStyle: "short",
-          })}`
-        : "Offline"}
-    </span>
-  )}
-</div>
+          <div className="text-sm flex items-center gap-1.5">
+            {isTyping ? (
+              <span className="text-emerald-400">Typing...</span>
+            ) : isOnline ? (
+              <>
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <span className="text-emerald-500">Online</span>
+              </>
+            ) : (
+              <span className="text-zinc-500">
+                {lastSeen
+                  ? `Last seen ${new Date(lastSeen).toLocaleString([], {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}`
+                  : "Offline"}
+              </span>
+            )}
+          </div>
         </div>
-{/* deletion */}
-      <div className="relative">
-   <button
-    onClick={()=>setShowMenu((prev)=>!prev)}
-    className="p-2 hover:bg-zinc-700 rounded-xl text-zinc-400"
-   >
-    <MoreVertical size={22}/>
+        {/* deletion */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu((prev) => !prev)}
+            className="p-2 hover:bg-zinc-700 rounded-xl text-zinc-400"
+          >
+            <MoreVertical size={22} />
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 top-12 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg w-40 z-50">
+              <button
+                onClick={handleDeleteChat}
+                className="w-full text-left px-4 py-3 text-red-400 hover:bg-zinc-700 rounded-lg"
+              >
+                Delete Chat
+              </button>
 
-   </button>
-   {showMenu&&(
-    <div className="absolute right-0 top-12 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg w-40 z-50">
-      <button 
-       onClick={handleDeleteChat}
-        className="w-full text-left px-4 py-3 text-red-400 hover:bg-zinc-700 rounded-lg">
-  Delete Chat  
-      </button>
-
-        <button
-      onClick={handleLogout}
-      className="w-full text-left px-4 py-3 text-zinc-200 hover:bg-zinc-700 rounded-lg"
-    >
-      Logout
-    </button>
-
-    </div>
-   )}
-
-      </div>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-3 text-zinc-200 hover:bg-zinc-700 rounded-lg"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Messages Display */}
@@ -508,7 +608,12 @@ const handleLogout = () => {
                       : "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-none"
                   }`}
                 >
-                  {msg.text}
+                  {msg.type === "audio" ? (
+                    <audio controls src={msg.audioUrl} className="max-w-full" />
+                  ) : (
+                    msg.text
+                  )}
+
                   <span
                     className={`absolute bottom-0.5 right-1 text-[10px] select-none ${
                       isMe ? "text-emerald-200" : "text-zinc-500"
@@ -516,16 +621,14 @@ const handleLogout = () => {
                   >
                     {msg.time}
                   </span>
-                 {
-                  isMe && (
-                      <button
-                    onClick= {()=>handleDelete(msg.id)}
-                    className="text-red-300 text-xs ml-3"
-                >
-                    Unsend
-                </button>
-                  )
-                 }
+                  {isMe && (
+                    <button
+                      onClick={() => handleDelete(msg.id)}
+                      className="text-red-300 text-xs ml-3"
+                    >
+                      Unsend
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -545,7 +648,6 @@ const handleLogout = () => {
             accept="image/*"
           />
 
-
           <div className="flex items-end gap-3 bg-zinc-900 rounded-2xl border border-zinc-700/50 focus-within:border-emerald-500 p-3">
             <div className="flex gap-1 text-zinc-400">
               <button
@@ -562,20 +664,57 @@ const handleLogout = () => {
               >
                 <Camera size={26} />
               </button>
-              <button
-                className="p-3 hover:bg-zinc-800 rounded-xl"
-                title="Voice"
-              >
-                <Mic size={26} />
-              </button>
+              {isRecording ? (
+                <div className="flex items-center gap-3 flex-1 bg-zinc-900 rounded-xl px-3 py-2">
+                  {/* Recording indicator */}
+                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+
+                  {/* Recording text */}
+                  <span className="text-red-400 font-medium">Recording</span>
+
+                  {/* Timer */}
+                  <span className="text-zinc-300 font-mono">
+                    {formatTime(recordingTime)}
+                  </span>
+
+                  {/* Stop button */}
+                  <button
+                    onClick={stopRecording}
+                    className="ml-auto p-2 bg-red-500 hover:bg-red-600 text-white rounded-full"
+                    title="Stop recording"
+                  >
+                    <div className="w-3 h-3 bg-white rounded-sm" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={startRecording}
+                  className="p-3 hover:bg-zinc-800 rounded-xl"
+                  title="Voice"
+                >
+                  <Mic size={26} />
+                </button>
+              )}
             </div>
 
+            {recordedAudio && !isRecording && (
+              <div className="mb-3 flex items-center gap-3 bg-zinc-900 border border-zinc-700 rounded-2xl p-3">
+                <audio controls src={recordedAudio} className="flex-1" />
+
+                <button
+                  onClick={deleteRecordedAudio}
+                  className="px-3 py-2 text-red-400 hover:bg-zinc-800 rounded-lg"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             <textarea
               ref={textareaRef}
               value={message}
-              onChange={(e)=>{
-                  console.log("TEXTAREA CHANGE:", e.target.value);
-    handleTyping(e);
+              onChange={(e) => {
+                console.log("TEXTAREA CHANGE:", e.target.value);
+                handleTyping(e);
               }}
               onKeyDown={handleKeyDown}
               rows="1"
@@ -585,7 +724,7 @@ const handleLogout = () => {
 
             <button
               onClick={handleSend}
-              disabled={!message.trim()}
+              disabled={!message.trim() && !recordedAudio}
               className="p-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-zinc-700 disabled:text-zinc-400 text-zinc-900 rounded-2xl transition-all active:scale-95"
             >
               <Send size={26} />

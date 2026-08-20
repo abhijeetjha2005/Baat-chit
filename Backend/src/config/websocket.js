@@ -232,6 +232,63 @@ await conversation.save();
 
   return;
 }
+if (data.type === "send_voice") {
+  console.log("SEND VOICE:", data);
+
+  const { senderId, receiverId, audioUrl } = data;
+
+  let conversation = await Conversation.findOne({
+    participants: { $all: [senderId, receiverId] },
+    isGroup: false,
+  });
+
+  if (!conversation) {
+    conversation = await Conversation.create({
+      participants: [senderId, receiverId],
+      isGroup: false,
+    });
+  }
+
+  const savedMessage = await Message.create({
+    conversationId: conversation._id,
+    sender: senderId,
+    messageType: "voice",
+    audioUrl: audioUrl,
+  });
+
+  conversation.lastMessage = savedMessage._id;
+  await conversation.save();
+
+  const messageData = {
+    type: "receive_message",
+
+    conversationId: conversation._id,
+
+    message: {
+      _id: savedMessage._id,
+      conversationId: savedMessage.conversationId,
+      sender: savedMessage.sender,
+      messageType: savedMessage.messageType,
+      audioUrl: savedMessage.audioUrl,
+      createdAt: savedMessage.createdAt,
+    },
+  };
+
+  // Send to receiver
+  const receiverSocket = activeUsers.get(receiverId.toString());
+
+  if (
+    receiverSocket &&
+    receiverSocket.readyState === WebSocket.OPEN
+  ) {
+    receiverSocket.send(JSON.stringify(messageData));
+  }
+
+  // Send back to sender
+  ws.send(JSON.stringify(messageData));
+
+  return;
+}
 if (data.type === "message_deleted") {
 
   const { messageId, conversationId } = data;
