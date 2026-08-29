@@ -1,5 +1,8 @@
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 const dns = require("dns");
+
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
@@ -14,6 +17,10 @@ connectDb();
 
 // Create HTTP Server
 const server = http.createServer(app);
+// Create audio upload directory
+fs.mkdirSync(path.join(__dirname, "uploads/audio"), {
+  recursive: true,
+});
 
 // Initialize WebSocket Server
 setupWebSocket(server);

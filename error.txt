@@ -1,0 +1,64 @@
+That was just my cat output concatenating two files together with no separator — not an actual bug in your code. Let me check the rest of the frontend properly, one file at a time.
+
+Ran 10 commands · 2 notes
+
+Confirmed — no uploads/audio/ folder exists at the Backend root, which multer needs. Here's the full bug list, grouped by severity.
+
+🔴 Critical — will crash or break a feature
+
+2. Voice upload will fail on a fresh server — missing folder
+multer.diskStorage in upload.routes.js writes to uploads/audio/, but that folder doesn't exist anywhere in the repo and nothing creates it at startup. First audio upload throws ENOENT: no such file or directory.
+Fix: at server start, fs.mkdirSync(path.join(__dirname, "../uploads/audio"), { recursive: true }).
+
+3. Dead/broken file: services/socket.services.js
+
+js
+const {websocket}=require('ws')                       // 'ws' exports WebSocket, not websocket
+const Conversation=require('../models/conversation.model ')  // trailing space in path — module not found
+...
+const wss=new WebSocketServer({server});               // WebSocketServer never imported/defined
+
+It's never actually used (real WS setup lives in config/websocket.js), but if anyone ever imports it, it throws immediately. Safe to delete, or fix and wire it up properly — right now it's confusing dead weight.
+
+4. No authentication on WebSocket connections (security bug)
+config/websocket.js never checks a JWT — any client can connect and just claim any senderId/userId in the message payload. That means anyone can:
+
+register as any user and appear "online" as them
+read another user's message history (fetch_messages with any senderId/receiverId)
+send messages while impersonating any sender
+broadcast a fake message_deleted event to wipe messages from everyone's UI, without it existing in the DB (see next bug)
+
+Fix: require the JWT on WS connect (e.g. ?token= query param or first auth message) and derive userId server-side from the verified token — never trust the client-sent userId.
+
+5. message_deleted over WebSocket doesn't delete anything
+In config/websocket.js, the message_deleted handler just re-broadcasts the event to all connected sockets — it never calls Message.findByIdAndDelete. The actual deletion only happens via the separate REST route (chat.controller.js). This happens to work today because the frontend calls the REST DELETE first and only then emits the WS event — but the WS handler itself will let anyone broadcast a fake deletion for a messageId they don't own, since there's no ownership check at all in that handler.
+
+🟠 Medium — real logic bugs affecting behavior
+
+6. Search box result never resets
+Friends.jsx: when you type a search, the server's search_results replaces friendsList entirely. When you clear the search box, nothing re-fetches the full contact list — friendsList stays stuck on the last search's smaller result set forever.
+Fix: when searchTerm becomes empty, re-send fetch_contacts_list, or keep the full list and search-results in separate state.
+
+7. Messages can leak into the wrong open chat
+Chatright.jsx, in the receive_message handler:
+
+js
+if (msgSenderId === receiverId || msgSenderId === currentUserId) { ...append... }
+
+If you're chatting with Friend A but you send (or have sent, from another tab) a message to Friend C, msgSenderId === currentUserId is true and it gets appended to the currently open chat with A — even though it belongs to a different conversation.
+Fix: also check data.conversationId === activeConversationId (or that receiverId matches) before appending.
+
+8. send_voice WS handler will throw if receiverId is missing
+
+js
+const receiverSocket = activeUsers.get(receiverId.toString());
+
+No optional chaining here, unlike the identical line in send_message (receiverId?.toString()). A malformed payload here throws and gets swallowed by the outer try/catch, silently failing.
+
+🟡 Minor / cleanliness
+src/config/db.js: connectDb = async () => {...} is missing const/let — creates an accidental global variable.
+src/uploads/audio.uploads.js is a completely empty, unused file.
+WebSocket URL (ws://localhost:3000) and all API URLs (http://localhost:3000/...) are hardcoded throughout the frontend instead of using an env var — will break the moment you deploy anywhere other than localhost.
+CORS origin in app.js is hardcoded to http://localhost:5173 — same deployment issue.
+express.static("uploads") and multer's "uploads/audio/" use relative paths tied to the process's working directory rather than path.join(__dirname, ...) — fragile if you ever start the server from a different folder.
+

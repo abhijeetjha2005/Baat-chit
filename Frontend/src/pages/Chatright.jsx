@@ -124,7 +124,9 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
 
             return {
               id: msg._id,
-              text: msg.text,
+              text: msg.text || "",
+              audioUrl: msg.audioUrl || null,
+              type: msg.messageType === "voice" ? "voice" : "text",
               sender: senderId === currentUserId ? "me" : "friend",
 
               time: new Date(msg.createdAt).toLocaleTimeString([], {
@@ -193,9 +195,9 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
               ...prev,
               {
                 id: msg._id,
-                text: msg.text || msg.content || "",
-                audioUrl: msg.audioUrl,
-                type: msg.type || "text",
+                text: msg.text || "",
+                audioUrl: msg.audioUrl || null,
+                type: msg.messageType,
                 sender: msgSenderId === currentUserId ? "me" : "friend",
                 time: new Date(msg.createdAt || Date.now()).toLocaleTimeString(
                   [],
@@ -221,6 +223,8 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
   }, [socket, receiverId]);
 
   const startRecording = async () => {
+    console.log("START RECORDING CALLED");
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -232,24 +236,29 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (event) => {
+        console.log("Audio chunk:", event.data.size);
+
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       recorder.onstop = () => {
+        console.log("Total chunks:", audioChunksRef.current.length);
+
         const audioBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
+          type: recorder.mimeType || "audio/webm",
         });
+
+        console.log("Audio blob size:", audioBlob.size);
+        console.log("Audio type:", audioBlob.type);
 
         const audioUrl = URL.createObjectURL(audioBlob);
 
         setRecordedAudio(audioUrl);
 
-        // Stop microphone
         stream.getTracks().forEach((track) => track.stop());
 
-        // Stop timer
         clearInterval(recordingTimerRef.current);
       };
 
@@ -341,48 +350,75 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
 
     // AUDIO MESSAGE
     // AUDIO MESSAGE
-if (recordedAudio) {
-  try {
-    console.log("Sending audio:", recordedAudio);
+    if (recordedAudio) {
+      try {
+        console.log("Sending audio:", recordedAudio);
 
-    const response = await fetch(recordedAudio);
-    const audioBlob = await response.blob();
+        // 1. Convert local blob URL to Blob
+        const response = await fetch(recordedAudio);
+        // This creates the recorded audio file in memory.
+        const audioBlob = await response.blob();
 
-    // Create a local URL for displaying the audio
-    const audioUrl = URL.createObjectURL(audioBlob);
+        console.log("Audio blob:", audioBlob);
+        console.log("Audio type:", audioBlob.type);
+        console.log("Audio size:", audioBlob.size);
 
-    // Show audio in chat immediately
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        type: "audio",
-        audioUrl: audioUrl,
-        sender: "me",
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      },
-    ]);
+        // 2. Upload audio to backend
+        const formData = new FormData();
 
-    // Now send the audio to backend
-    const audioBuffer = await audioBlob.arrayBuffer();
+        formData.append("audio", audioBlob, "voice-message.webm");
 
-    socket.send(audioBuffer);
+        const uploadResponse = await fetch(
+          "http://localhost:3000/api/upload/audio",
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
 
-    console.log("Audio sent!");
+        const uploadData = await uploadResponse.json();
+        if(!uploadResponse.ok){
+          throw new Error(uploadData.message || "Audio upload failed")
+        }
+     const audioUrlFromServer=uploadData.audioUrl;
 
-    URL.revokeObjectURL(recordedAudio);
-    setRecordedAudio(null);
-    setRecordingTime(0);
+        console.log("UPLOAD STATUS:", uploadResponse.status);
+        console.log("UPLOAD RESPONSE:", responseText);
 
-    return;
-  } catch (error) {
-    console.error("Audio sending error:", error);
-  }
-}
- 
+        if (!uploadResponse.ok) {
+          throw new Error(uploadData.message || "Audio upload failed");
+        }
+
+        console.log("SERVER AUDIO URL:", audioUrlFromServer);
+
+        if (!audioUrlFromServer) {
+          throw new Error("Backend did not return audioUrl");
+        }
+
+        // 4. Send audio message through WebSocket
+        const payload = {
+          type: "send_voice",
+          senderId: currentUserId,
+          receiverId: receiverId,
+          audioUrl: audioUrlFromServer,
+          messageType: "voice",
+        };
+
+        // console.log("SENDING AUDIO MESSAGE:", payload);
+
+        socket.send(JSON.stringify(payload));
+
+        // 5. Clear recorded audio
+        URL.revokeObjectURL(recordedAudio);
+        setRecordedAudio(null);
+        setRecordingTime(0);
+
+        return;
+      } catch (error) {
+        console.error("Audio sending error:", error);
+      }
+    }
+
     // TEXT MESSAGE
     if (!message.trim()) return;
 
@@ -608,7 +644,7 @@ if (recordedAudio) {
                       : "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-none"
                   }`}
                 >
-                  {msg.type === "audio" ? (
+                  {msg.type === "voice" ? (
                     <audio controls src={msg.audioUrl} className="max-w-full" />
                   ) : (
                     msg.text
