@@ -6,9 +6,7 @@ Confirmed — no uploads/audio/ folder exists at the Backend root, which multer 
 
 🔴 Critical — will crash or break a feature
 
-2. Voice upload will fail on a fresh server — missing folder
-multer.diskStorage in upload.routes.js writes to uploads/audio/, but that folder doesn't exist anywhere in the repo and nothing creates it at startup. First audio upload throws ENOENT: no such file or directory.
-Fix: at server start, fs.mkdirSync(path.join(__dirname, "../uploads/audio"), { recursive: true }).
+
 
 3. Dead/broken file: services/socket.services.js
 
