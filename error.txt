@@ -1,32 +1,4 @@
-That was just my cat output concatenating two files together with no separator — not an actual bug in your code. Let me check the rest of the frontend properly, one file at a time.
 
-Ran 10 commands · 2 notes
-
-Confirmed — no uploads/audio/ folder exists at the Backend root, which multer needs. Here's the full bug list, grouped by severity.
-
-🔴 Critical — will crash or break a feature
-
-
-
-3. Dead/broken file: services/socket.services.js
-
-js
-const {websocket}=require('ws')                       // 'ws' exports WebSocket, not websocket
-const Conversation=require('../models/conversation.model ')  // trailing space in path — module not found
-...
-const wss=new WebSocketServer({server});               // WebSocketServer never imported/defined
-
-It's never actually used (real WS setup lives in config/websocket.js), but if anyone ever imports it, it throws immediately. Safe to delete, or fix and wire it up properly — right now it's confusing dead weight.
-
-4. No authentication on WebSocket connections (security bug)
-config/websocket.js never checks a JWT — any client can connect and just claim any senderId/userId in the message payload. That means anyone can:
-
-register as any user and appear "online" as them
-read another user's message history (fetch_messages with any senderId/receiverId)
-send messages while impersonating any sender
-broadcast a fake message_deleted event to wipe messages from everyone's UI, without it existing in the DB (see next bug)
-
-Fix: require the JWT on WS connect (e.g. ?token= query param or first auth message) and derive userId server-side from the verified token — never trust the client-sent userId.
 
 5. message_deleted over WebSocket doesn't delete anything
 In config/websocket.js, the message_deleted handler just re-broadcasts the event to all connected sockets — it never calls Message.findByIdAndDelete. The actual deletion only happens via the separate REST route (chat.controller.js). This happens to work today because the frontend calls the REST DELETE first and only then emits the WS event — but the WS handler itself will let anyone broadcast a fake deletion for a messageId they don't own, since there's no ownership check at all in that handler.

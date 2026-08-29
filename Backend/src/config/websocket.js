@@ -1,5 +1,6 @@
 const WebSocket = require("ws");
 const mongoose = require("mongoose");
+const jwt =require("jsonwebtoken")
 const User = require("../models/user.model"); // Ensure path matches your structure
 const Message=require("../models/message.model")
 const Conversation=require("../models/conversation.model")
@@ -19,15 +20,38 @@ const setupWebSocket = (server) => {
        console.log("RAW MESSAGE:", message.toString());
       try {
         const data = JSON.parse(message);
+        // authentication handling
+        if(!ws.isAuthenticated){
+          if(data.type!=="authenticate"||!data.token){
+            ws.close(1008,"Authentication required");
+            return;
+          }
+          try{
+             const decoded=jwt.verify(data.token, process.env.JWT_SECRET); 
+             ws.userId=decoded.id.toString();
+             ws.isAuthenticated=true;
+             console.log("websocket authenticated",ws.userId);
+             
+             console.log("websocket authenticated", ws.userId);
+             
+             ws.send(
+  JSON.stringify({
+    type: "authenticated",
+    userId: ws.userId,
+  })
+)
+          }catch(error){
+            console.error("WebSocket JWT error:", error.message);
+         ws.close(1008, "Invalid or expired token");
+       return;
+        }   
+        }        
 
         // --- NEW: Register user connection on connect/auth ---
 if (data.type === "register") {
-  if (data.userId) {
-    const userId = data.userId.toString();
-
-    activeUsers.set(userId, ws);
-    ws.userId = userId;
-
+ 
+   const userId =ws.userId;
+   activeUsers.set(userId,ws);
     // Mark user online
     await User.findByIdAndUpdate(userId, {
       isOnline: true
@@ -50,20 +74,15 @@ if (data.type === "register") {
         );
       }
     }
-  }
+  
 
   return;
 }
 
         // --- FETCH CONTACTS LIST ---
         if (data.type === "fetch_contacts_list") {
-          const currentUserId = data.userId;
+         const currentUserId = ws.userId;
 
-          // Register user ID if sent along with this request
-          if (currentUserId) {
-            activeUsers.set(currentUserId.toString(), ws);
-            ws.userId = currentUserId.toString();
-          }
 
           const isValidId = currentUserId && mongoose.Types.ObjectId.isValid(currentUserId);
           const query = isValidId ? { _id: { $ne: currentUserId } } : {};
@@ -111,7 +130,8 @@ if (data.type === "fetch_messages") {
 
   console.log("FETCH MESSAGE REQUEST:", data);
 
-  const { senderId, receiverId } = data;
+const senderId = ws.userId;
+const { receiverId } = data;  
 
   // Send current receiver status immediately
   const receiver = await User.findById(receiverId)
@@ -160,7 +180,8 @@ if (data.type === "fetch_messages") {
   return;
 }
   if(data.type==="typing"){
-    const {senderId,receiverId,isTyping}=data;
+   const senderId = ws.userId;
+const { receiverId, isTyping } = data;
     console.log("Typing Event" ,{
       senderId,
       receiverId,
@@ -185,7 +206,8 @@ if (data.type === "send_message") {
 
   console.log("SEND MESSAGE:", data);
 
-  const { senderId, receiverId, text } = data;
+  const senderId = ws.userId;
+const { receiverId, text } = data;
 
 let conversation=await Conversation.findOne({
   participants :{$all :[senderId,receiverId]},
@@ -235,7 +257,8 @@ await conversation.save();
 if (data.type === "send_voice") {
   console.log("SEND VOICE:", data);
 
-  const { senderId, receiverId, audioUrl } = data;
+  const senderId = ws.userId;
+const { receiverId, audioUrl } = data;
 
   let conversation = await Conversation.findOne({
     participants: { $all: [senderId, receiverId] },

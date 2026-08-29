@@ -12,10 +12,30 @@ const ChatLeft = ({
   const [isFocused, setIsFocused] = useState(false);
 
   // Triggered when user submits search or presses Enter
-  const handleSearch = (e) => {
-    if (e) e.preventDefault();
-     console.log("Search clicked:", searchTerm);
-  };
+ const handleSearch = (e) => {
+  if (e) e.preventDefault();
+
+  console.log("Search clicked:", searchTerm);
+
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.log("WebSocket is not connected");
+    return;
+  }
+
+  if (!searchTerm.trim()) {
+    console.log("Search is empty");
+    return;
+  }
+
+  socket.send(
+    JSON.stringify({
+      type: "search_users",
+      query: searchTerm.trim(),
+    })
+  );
+
+  console.log("Search request sent");
+};
 
   // Clear search field
   const handleClear = (e) => {

@@ -9,41 +9,43 @@ const [socket, setSocket] = useState(null);
 
 useEffect(() => {
   const ws = new WebSocket("ws://localhost:3000");
+ setSocket(ws);
+ws.onopen = () => {
+  console.log("WebSocket Connected");
 
-  ws.onopen = () => {
-    console.log("WebSocket Connected");
+  const token = localStorage.getItem("token");
 
-  const user = JSON.parse(localStorage.getItem("user"));
-  console.log("FULL USER:", user);
+  if (!token) {
+    console.log("No JWT token found");
+    return;
+  }
 
- const userId =
-  user?._id ||
-  user?.id ||
-  user?.user?._id ||
-  user?.user?.id;
-  
-  console.log("FINAL USER ID", userId);
-
-  
-    if (userId) {
-     const registerPayload={
-      type:"register",
-      userId,
-     }
-     console.log("Sending register:",registerPayload);
-     ws.send(JSON.stringify(registerPayload));
-     
-    }else{
-      console.log("no user found");
-      
-    }
-
-
-    setSocket(ws);
+  const authenticatePayload = {
+    type: "authenticate",
+    token: token,
   };
-    ws.onmessage = (event) => {
-    console.log("WS message:", event.data);
-  };
+
+  console.log("Sending authentication");
+
+  ws.send(JSON.stringify(authenticatePayload));
+};
+  ws.onmessage = (event) => {
+  console.log("WS message:", event.data);
+
+  const data = JSON.parse(event.data);
+
+  if (data.type === "authenticated") {
+    console.log("WebSocket authenticated");
+
+    ws.send(
+      JSON.stringify({
+        type: "register",
+      })
+    );
+
+    console.log("Register sent");
+  }
+};
   ws.onclose = (event) => {
      console.log("WebSocket disconnected");
   console.log("Code:", event.code);
