@@ -25,10 +25,7 @@ default:null
 type:String,
 default:null
   },
-  deletedFor:[{
-    type:mongoose.Schema.Types.ObjectId,
-    ref:'User'
-  }]
+
 },
 
   

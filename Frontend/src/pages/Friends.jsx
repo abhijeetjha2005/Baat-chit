@@ -79,18 +79,26 @@ const Friends = ({ socket, searchTerm = "", onChatSelect, selectedChat }) => {
   }, [socket, actualUserId]);
 
   // Send search query to socket backend on search input
-  useEffect(() => {
-     console.log("Search changed:", searchTerm);
-    if (searchTerm.trim() && socket && socket.readyState === WebSocket.OPEN) {
-       console.log("Sending search request");
-      socket.send(
-        JSON.stringify({
-          type: "search_users",
-          query: searchTerm,
-        })
-      );
-    }
-  }, [searchTerm, socket]);
+useEffect(() => {
+  console.log("Search changed:", searchTerm);
+
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+  if (searchTerm.trim() === "") {
+    socket.send(
+      JSON.stringify({
+        type: "fetch_contacts_list",
+      })
+    );
+  } else {
+    socket.send(
+      JSON.stringify({
+        type: "search_users",
+        query: searchTerm,
+      })
+    );
+  }
+}, [searchTerm, socket]);
 
   
   // Local search filter fallback

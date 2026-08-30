@@ -58,32 +58,7 @@ res.status(200).json({
  * @acess  Private
  */
 
-// 2. GROUP CHAT: Create Group
 
-// exports.createGroup = async (req, res) => {
-//   try {
-//     const adminId = req.user.id;
-//     const { title, participantIds } = req.body; // Array of user IDs
-
-//     if (!title || !participantIds || participantIds.length === 0) {
-//       return res.status(400).json({ message: "Group title and members are required." });
-//     }
-
-//     // Ensure the creator is included in the group members array
-//     const uniqueParticipants = Array.from(new Set([...participantIds, adminId]));
-
-//     const group = await Conversation.create({
-//       groupTitle: title,
-//       participants: uniqueParticipants,
-//       isGroup: true,
-//       groupAdmin: adminId
-//     });
-
-//     res.status(201).json(group);
-//   } catch (error) {
-//     res.status(500).json({ message: "Server Error", error: error.message });
-//   }
-// };
 
 // send messages
 exports.sendMessage = async (req, res) => {
@@ -112,6 +87,7 @@ if (!isParticipant) {
         message: "Unauthorized to post in this chat."
     });
 }
+
 
     const newMessage = await Message.create({
       conversationId,
@@ -201,7 +177,11 @@ exports.deleteConversation=async(req,res)=>{
     const userId = req.user.id;
     const { conversationId } = req.params;
 
+  console.log("DELETE USER ID:", userId);
+   
+
     const conversation = await Conversation.findById(conversationId);
+     console.log("DELETE CONVERSATION ID:", conversationId);
     if (!conversation) return res.status(404).json({ message: "Chat not found." });
 
     // Group Security Rule: Only group admin can completely dissolve a group chat

@@ -30,6 +30,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const mediaRecorderRef = useRef(null);
+  const activeConversationIdRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
 
@@ -82,7 +83,10 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
     if (!socket || !receiverId || !currentUserId) {
       return;
     }
-
+  if (socket.readyState !== WebSocket.OPEN) {
+    console.log("WebSocket not open yet");
+    return;
+  }
     const payload = {
       type: "fetch_messages",
       senderId: currentUserId,
@@ -92,7 +96,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
     console.log("fetching old messages:", payload);
 
     socket.send(JSON.stringify(payload));
-  }, [socket, selectedChat]);
+  }, [socket,receiverId, currentUserId ]);
   // 4. Auto-scroll when messages update
   useEffect(() => {
     scrollToBottom();
@@ -117,6 +121,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
         if (data.type === "old_messages") {
           if (data.conversationId) {
             setActiveConversationId(data.conversationId);
+              activeConversationIdRef.current = data.conversationId;
           }
 
           const formattedMessages = data.messages.map((msg) => {
@@ -140,16 +145,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
           setMessages(formattedMessages);
           return;
         }
-        if (data.type === "message_deleted") {
-          console.log("MESSAGE DELETED FROM WS:", data.messageId);
-
-          setMessages((prev) =>
-            prev.filter((msg) => msg.id !== data.messageId),
-          );
-
-          return;
-        }
-
+     
         if (data.type === "user_status_change") {
           console.log("STATUS EVENT:", {
             eventUserId: data.userId,
@@ -181,35 +177,65 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
         }
 
         // Match typical real-time message types
-        if (data.type === "receive_message") {
-          const msg = data.message || data;
-          const msgSenderId = (
-            msg.senderId ||
-            msg.sender?._id ||
-            msg.sender
-          )?.toString();
+     if (data.type === "receive_message") {
+  const msg = data.message || data;
 
-          // Only append if the message is from the user we are currently chatting with
-          if (msgSenderId === receiverId || msgSenderId === currentUserId) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: msg._id,
-                text: msg.text || "",
-                audioUrl: msg.audioUrl || null,
-                type: msg.messageType,
-                sender: msgSenderId === currentUserId ? "me" : "friend",
-                time: new Date(msg.createdAt || Date.now()).toLocaleTimeString(
-                  [],
-                  {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  },
-                ),
-              },
-            ]);
-          }
-        }
+  const msgSenderId = (
+    msg.senderId ||
+    msg.sender?._id ||
+    msg.sender
+  )?.toString();
+
+  const incomingConversationId = data.conversationId?.toString();
+    const activeConversationId =
+    activeConversationIdRef.current;
+
+  console.log("RECEIVE MESSAGE CHECK:", {
+    incomingConversationId,
+    activeConversationId,
+    msgSenderId,
+    receiverId,
+    currentUserId,
+  });
+
+  // If conversation ID is not set yet, set it
+  if (!activeConversationId && incomingConversationId) {
+    setActiveConversationId(incomingConversationId);
+  }
+
+  // Accept message if it belongs to current conversation
+  if (
+    (!activeConversationId ||
+      incomingConversationId === activeConversationId?.toString()) &&
+    (msgSenderId === receiverId || msgSenderId === currentUserId)
+  ) {
+    setMessages((prev) => {
+      // Prevent duplicate message
+      if (prev.some((m) => m.id === msg._id)) {
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          id: msg._id,
+          text: msg.text || "",
+          audioUrl: msg.audioUrl || null,
+          type: msg.messageType === "voice" ? "voice" : "text",
+          sender: msgSenderId === currentUserId ? "me" : "friend",
+          time: new Date(
+            msg.createdAt || Date.now()
+          ).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      ];
+    });
+  }
+
+  return;
+}
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
       }
@@ -220,7 +246,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
     return () => {
       socket.removeEventListener("message", handleMessage);
     };
-  }, [socket, receiverId]);
+  }, [socket, receiverId,currentUserId]);
 
   const startRecording = async () => {
     console.log("START RECORDING CALLED");
@@ -377,20 +403,16 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
         );
 
         const uploadData = await uploadResponse.json();
+        console.log("UPLOAD STATUS:", uploadResponse.status);
+console.log("UPLOAD RESPONSE:", uploadData);
+
         if(!uploadResponse.ok){
           throw new Error(uploadData.message || "Audio upload failed")
         }
      const audioUrlFromServer=uploadData.audioUrl;
 
-        console.log("UPLOAD STATUS:", uploadResponse.status);
-        console.log("UPLOAD RESPONSE:", responseText);
-
-        if (!uploadResponse.ok) {
-          throw new Error(uploadData.message || "Audio upload failed");
-        }
-
-        console.log("SERVER AUDIO URL:", audioUrlFromServer);
-
+      
+   
         if (!audioUrlFromServer) {
           throw new Error("Backend did not return audioUrl");
         }
@@ -401,10 +423,10 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
           senderId: currentUserId,
           receiverId: receiverId,
           audioUrl: audioUrlFromServer,
-          messageType: "voice",
+        
         };
 
-        // console.log("SENDING AUDIO MESSAGE:", payload);
+        console.log("SENDING AUDIO MESSAGE:", payload);
 
         socket.send(JSON.stringify(payload));
 
@@ -424,7 +446,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
 
     const payload = {
       type: "send_message",
-      senderId: currentUserId,
+     
       receiverId: receiverId,
       text: message.trim(),
     };
@@ -433,60 +455,15 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
 
     setMessage("");
   };
-  // delete logic
-  const handleDelete = async (messageId) => {
-    console.log("DELETE MESSAGE ID:", messageId);
 
-    if (!messageId) {
-      console.error("Invalid message ID:", messageId);
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(
-        `http://localhost:3000/api/chat/message/${messageId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      const data = await res.json();
-
-      console.log("DELETE STATUS:", res.status);
-      console.log("DELETE RESPONSE:", data);
-
-      if (res.ok) {
-        // Remove from current user's screen
-        setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-
-        // Notify other user through WebSocket
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(
-            JSON.stringify({
-              type: "message_deleted",
-              messageId: messageId,
-              conversationId: activeConversationId,
-            }),
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Delete message error:", error);
-    }
-  };
 
   const handleDeleteChat = async () => {
     if (!activeConversationId) {
       console.error("No active conversation ID");
       return;
     }
-
+console.log("DELETE CONVERSATION ID:", activeConversationId);
+console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${activeConversationId}`);
     try {
       const token = localStorage.getItem("token");
 
@@ -645,7 +622,9 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
                   }`}
                 >
                   {msg.type === "voice" ? (
-                    <audio controls src={msg.audioUrl} className="max-w-full" />
+                    <audio controls
+                     src={`http://localhost:3000${msg.audioUrl}`}
+                     className="max-w-full" />
                   ) : (
                     msg.text
                   )}
@@ -657,14 +636,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
                   >
                     {msg.time}
                   </span>
-                  {isMe && (
-                    <button
-                      onClick={() => handleDelete(msg.id)}
-                      className="text-red-300 text-xs ml-3"
-                    >
-                      Unsend
-                    </button>
-                  )}
+              
                 </div>
               </div>
             );

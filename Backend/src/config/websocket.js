@@ -32,7 +32,7 @@ const setupWebSocket = (server) => {
              ws.isAuthenticated=true;
              console.log("websocket authenticated",ws.userId);
              
-             console.log("websocket authenticated", ws.userId);
+            
              
              ws.send(
   JSON.stringify({
@@ -56,6 +56,7 @@ if (data.type === "register") {
     await User.findByIdAndUpdate(userId, {
       isOnline: true
     });
+
 
     console.log(`User registered on WS: ${userId}`);
 
@@ -165,6 +166,7 @@ const { receiverId } = data;
 
   const messages = await Message.find({
     conversationId: conversation._id,
+     
   }).sort({ createdAt: 1 });
 
   console.log("FOUND MESSAGES:", messages);
@@ -257,7 +259,6 @@ await conversation.save();
 if (data.type === "send_voice") {
   console.log("SEND VOICE:", data);
 
-  const senderId = ws.userId;
 const { receiverId, audioUrl } = data;
 
   let conversation = await Conversation.findOne({
@@ -298,7 +299,7 @@ const { receiverId, audioUrl } = data;
   };
 
   // Send to receiver
-  const receiverSocket = activeUsers.get(receiverId.toString());
+  const receiverSocket = activeUsers.get(receiverId?.toString());
 
   if (
     receiverSocket &&
@@ -312,31 +313,7 @@ const { receiverId, audioUrl } = data;
 
   return;
 }
-if (data.type === "message_deleted") {
 
-  const { messageId, conversationId } = data;
-
-  console.log("MESSAGE DELETE EVENT:", messageId);
-
-  // Send deletion event to everyone in this conversation
-  for (const [userId, userSocket] of activeUsers.entries()) {
-
-    if (
-      userSocket.readyState === WebSocket.OPEN
-    ) {
-      userSocket.send(
-        JSON.stringify({
-          type: "message_deleted",
-          messageId: messageId,
-          conversationId: conversationId
-        })
-      );
-    }
-
-  }
-
-  return;
-}
       } catch (err) {
         console.error("WebSocket message processing error:", err.message);
 
