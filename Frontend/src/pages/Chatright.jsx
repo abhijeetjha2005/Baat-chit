@@ -28,6 +28,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [showMenu, setShowMenu] = useState(false);
+  const [isDeletingChat, setIsDeletingChat] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const mediaRecorderRef = useRef(null);
   const activeConversationIdRef = useRef(null);
@@ -458,8 +459,8 @@ console.log("UPLOAD RESPONSE:", uploadData);
 
 
   const handleDeleteChat = async () => {
-    if (!activeConversationId) {
-      console.error("No active conversation ID");
+    if (!activeConversationId || isDeletingChat) {
+      
       return;
     }
 console.log("DELETE CONVERSATION ID:", activeConversationId);
@@ -493,6 +494,9 @@ console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${active
       }
     } catch (error) {
       console.error("Delete chat error:", error);
+    }
+    finally{
+       setIsDeletingChat(false);
     }
   };
 
@@ -577,6 +581,7 @@ console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${active
             <div className="absolute right-0 top-12 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg w-40 z-50">
               <button
                 onClick={handleDeleteChat}
+                disabled={isDeletingChat}
                 className="w-full text-left px-4 py-3 text-red-400 hover:bg-zinc-700 rounded-lg"
               >
                 Delete Chat

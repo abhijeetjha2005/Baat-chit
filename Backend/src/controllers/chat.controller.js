@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Conversation = require('../models/conversation.model');
 const Message = require('../models/message.model');
 
@@ -171,45 +172,56 @@ await Conversation.findByIdAndUpdate(message.conversationId, {
 };
 
 // delete conversation
-exports.deleteConversation=async(req,res)=>{
-  try{
-
+exports.deleteConversation = async (req, res) => {
+  try {
     const userId = req.user.id;
     const { conversationId } = req.params;
 
-  console.log("DELETE USER ID:", userId);
-   
+    console.log("DELETE CONVERSATION ID:", conversationId);
+    console.log("DELETE USER ID:", userId);
 
     const conversation = await Conversation.findById(conversationId);
-     console.log("DELETE CONVERSATION ID:", conversationId);
-    if (!conversation) return res.status(404).json({ message: "Chat not found." });
 
-    // Group Security Rule: Only group admin can completely dissolve a group chat
-    if (conversation.isGroup && conversation.groupAdmin.toString() !== userId) {
-      return res.status(403).json({ message: "Only group admins can delete group chats." });
+    if (!conversation) {
+      return res.status(200).json({
+        message: "Chat already deleted"
+      });
     }
 
-    // Personal Chat Security Rule: Must be part of it
-const isParticipant = conversation.participants.some(
-  (id) => id.toString() === userId
-);
+    const isParticipant = conversation.participants.some(
+      (id) => id.toString() === userId.toString()
+    );
 
-if (!conversation.isGroup && !isParticipant) {
-  return res.status(403).json({
-    message: "Unauthorized."
-  });
-}  
+    if (!isParticipant) {
+      return res.status(403).json({
+        message: "Unauthorized."
+      });
+    }
 
-    await Message.deleteMany({ conversationId });
+    // Delete all messages belonging to this conversation
+    await Message.deleteMany({
+      conversationId: conversationId
+    });
+
+    // Delete conversation
     await Conversation.findByIdAndDelete(conversationId);
 
-   return res.status(200).json({
-  message: "Conversation deleted successfully."
-});
-  }catch(error){
-res.status(500).json({ message: "Server Error", error: error.message });
+    console.log("Conversation deleted:", conversationId);
+
+    return res.status(200).json({
+      message: "Conversation deleted successfully.",
+      conversationId
+    });
+
+  } catch (error) {
+    console.error("Delete conversation error:", error);
+
+    return res.status(500).json({
+      message: "Server Error",
+      error: error.message
+    });
   }
-}
+};
 
 exports.getConversation=async(req,res)=>{
   try{

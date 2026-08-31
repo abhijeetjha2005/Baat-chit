@@ -258,7 +258,7 @@ await conversation.save();
 }
 if (data.type === "send_voice") {
   console.log("SEND VOICE:", data);
-
+  const senderId = ws.userId;
 const { receiverId, audioUrl } = data;
 
   let conversation = await Conversation.findOne({
