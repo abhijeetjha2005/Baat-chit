@@ -10,7 +10,7 @@ const [socket, setSocket] = useState(null);
 const [isSakhaOpen, setIsSakhaOpen] = useState(false);
 
 useEffect(() => {
-  const ws = new WebSocket("ws://localhost:3000");
+  const ws = new WebSocket("https://baat-chit-2269.onrender.com/api/auth/login");
  setSocket(ws);
 ws.onopen = () => {
   console.log("WebSocket Connected");
