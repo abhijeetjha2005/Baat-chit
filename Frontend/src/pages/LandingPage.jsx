@@ -21,41 +21,49 @@ const handleChange =(e)=>{
 })
 }
 
-const handleSubmit= async(e)=>{
+const handleSubmit = async (e) => {
   e.preventDefault();
   setError("");
-  try{
-setLoading(true)
-const response=await axios.post
-(
-  "https://baat-chit-2269.onrender.com/api/auth/login",
-{
-email:formData.email,
-password:formData.password,
-  }
-)
-console.log("LOGIN RESPONSE:", response.data);
-if (response.data.message === "Login successful") {
-  localStorage.setItem(
-    "user",
-    JSON.stringify(response.data.user)
-  )
-   localStorage.setItem(
-    "token",
-    response.data.token
-  );
+
+  try {
+    setLoading(true);
+
+    const response = await axios.post(
+      "https://baat-chit-2269.onrender.com/api/auth/login",
+      {
+        email: formData.email,
+        password: formData.password,
+      },
+      {
+        withCredentials: true,
+      }
+    );
+
+    console.log("LOGIN RESPONSE:", response.data);
+
+    if (response.data.token && response.data.user) {
+      localStorage.setItem(
+        "user",
+        JSON.stringify(response.data.user)
+      );
+
+      localStorage.setItem(
+        "token",
+        response.data.token
+      );
 
       navigate("/chat");
-}
-  }catch(error){
+    }
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+
     setError(
-      error.response?.data?.message||"login Failed"
-    )
-  }finally {
+      error.response?.data?.message || "Login failed"
+    );
+  } finally {
     setLoading(false);
   }
-}
-
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-black to-zinc-950 flex items-center justify-center px-4 py-8 sm:px-6">
