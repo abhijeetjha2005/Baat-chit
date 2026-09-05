@@ -30,7 +30,7 @@ const handleSend = async () => {
   setMessage("");
 setIsLoading(true);
   try {
-    const response = await fetch("http://localhost:3000/api/sakha", {
+    const response = await fetch("https://baat-chit-2269.onrender.com/api/sakha", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

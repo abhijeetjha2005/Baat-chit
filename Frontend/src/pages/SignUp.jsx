@@ -46,7 +46,7 @@ const SignUp = () => {
     setLoading(true);
 
     try {
-      const response =await axios.post(  "http://localhost:3000/api/auth/send-otp",
+      const response =await axios.post(  "https://baat-chit-2269.onrender.com/api/auth/send-otp",
           {
       name: formData.fullName,
       email: formData.email,

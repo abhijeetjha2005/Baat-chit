@@ -17,7 +17,7 @@ const Forgot = () => {
     try {
       setLoading(true);
       // Replace with your actual forgot password backend route
-      const response = await axios.post("http://localhost:3000/api/auth/forgot-password", {
+      const response = await axios.post("https://baat-chit-2269.onrender.com/api/auth/forgot-password", {
         email,
       });
       

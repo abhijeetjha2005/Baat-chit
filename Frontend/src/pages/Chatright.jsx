@@ -416,7 +416,7 @@ if (selectedFile) {
     const token = localStorage.getItem("token");
 
     const uploadResponse = await fetch(
-      "http://localhost:3000/api/upload/file",
+      "https://baat-chit-2269.onrender.com/api/upload/file",
       {
         method: "POST",
         headers: {
@@ -494,7 +494,7 @@ if (selectedFile) {
         formData.append("audio", audioBlob, "voice-message.webm");
 
         const uploadResponse = await fetch(
-          "http://localhost:3000/api/upload/audio",
+          "https://baat-chit-2269.onrender.com/api/upload/audio",
           {
             method: "POST",
             body: formData,
@@ -562,12 +562,12 @@ console.log("UPLOAD RESPONSE:", uploadData);
       return;
     }
 console.log("DELETE CONVERSATION ID:", activeConversationId);
-console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${activeConversationId}`);
+console.log("DELETE URL:", `https://baat-chit-2269.onrender.com/api/chat/conversation/${activeConversationId}`);
     try {
       const token = localStorage.getItem("token");
 
       const res = await fetch(
-        `http://localhost:3000/api/chat/conversation/${activeConversationId}`,
+        `https://baat-chit-2269.onrender.com/api/chat/conversation/${activeConversationId}`,
         {
           method: "DELETE",
           headers: {
@@ -727,20 +727,20 @@ console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${active
                  {msg.type === "voice" ? (
   <audio
     controls
-    src={`http://localhost:3000${msg.audioUrl}`}
+    src={`https://baat-chit-2269.onrender.com${msg.audioUrl}`}
     className="max-w-full"
   />
 ) : msg.type === "file" ? (
   <div>
     {msg.fileType?.startsWith("image/") ? (
       <img
-        src={`http://localhost:3000${msg.fileUrl}`}
+        src={`https://baat-chit-2269.onrender.com${msg.fileUrl}`}
         alt={msg.fileName}
         className="max-w-full rounded-lg"
       />
     ) : (
       <a
-        href={`http://localhost:3000${msg.fileUrl}`}
+        href={`https://baat-chit-2269.onrender.com${msg.fileUrl}`}
         target="_blank"
         rel="noopener noreferrer"
         className="text-blue-300 underline"

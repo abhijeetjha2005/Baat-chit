@@ -34,7 +34,7 @@ const ResetPass = () => {
     try {
       setLoading(true);
       const response = await axios.post(
-        "http://localhost:3000/api/auth/reset-password",
+        "]https://baat-chit-2269.onrender.com/api/auth/reset-password",
         {
           token,
           password,
