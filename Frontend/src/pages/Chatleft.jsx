@@ -6,6 +6,7 @@ const ChatLeft = ({
   socket, 
   onChatSelect, 
   selectedChat,
+  onOpenSakha,
   showBackButton = false 
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -114,6 +115,7 @@ console.log("ChatLeft search:", searchTerm);
             searchTerm={searchTerm} 
             onChatSelect={onChatSelect} 
             selectedChat={selectedChat}
+            onOpenSakha={onOpenSakha}
           />
         </div>
       </div>

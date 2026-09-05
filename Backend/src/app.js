@@ -7,6 +7,7 @@ const authRoutes = require("./routes/auth.routes");
 const chatRoutes = require("./routes/chat.routes");
 const statusRoutes = require("./routes/status.routes");
 const uploadRoutes = require("./routes/upload.routes");
+const sakhaRoutes = require("./routes/sakha.routes");
 
 const app = express();
 
@@ -27,5 +28,6 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/uploads", express.static("uploads"));
+app.use("/api/sakha", sakhaRoutes);
 
 module.exports = app;

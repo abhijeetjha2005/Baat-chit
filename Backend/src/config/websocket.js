@@ -413,39 +413,45 @@ if (data.type === "send_file") {
   console.error("WebSocket ERROR:", error);
 });
     // Clean up mapping when socket closes
- ws.on("close", async () => {
-  if (ws.userId) {
-    const userId = ws.userId;
+ws.on("close", async () => {
+  if (!ws.userId) {
+    console.log("Unregistered user disconnected");
+    return;
+  }
 
-    activeUsers.delete(userId);
+  const userId = ws.userId;
 
-    // Mark user offline and save last seen
-    const lastSeen = new Date();
+  try {
+    // Only remove this socket if it is still
+    // the active socket for this user
+    if (activeUsers.get(userId) === ws) {
+      activeUsers.delete(userId);
 
-    await User.findByIdAndUpdate(userId, {
-      isOnline: false,
-      lastSeen: lastSeen,
-    });
+      const lastSeen = new Date();
 
-    // Notify other connected users
-    for (const [otherUserId, otherSocket] of activeUsers.entries()) {
-      if (
-        otherSocket.readyState === WebSocket.OPEN
-      ) {
-        otherSocket.send(
-          JSON.stringify({
-            type: "user_status_change",
-            userId: userId,
-            status: "offline",
-            lastSeen: lastSeen,
-          })
-        );
+      await User.findByIdAndUpdate(userId, {
+        isOnline: false,
+        lastSeen: lastSeen,
+      });
+
+      // Notify other connected users
+      for (const [otherUserId, otherSocket] of activeUsers.entries()) {
+        if (otherSocket.readyState === WebSocket.OPEN) {
+          otherSocket.send(
+            JSON.stringify({
+              type: "user_status_change",
+              userId: userId,
+              status: "offline",
+              lastSeen: lastSeen,
+            })
+          );
+        }
       }
     }
 
     console.log(`User ${userId} disconnected`);
-  } else {
-    console.log("Unregistered user disconnected");
+  } catch (error) {
+    console.error("Error during WebSocket close:", error);
   }
 });
   });

@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from "react";
-import Ai from "../components/Ai";
 
-const Friends = ({ socket, searchTerm = "", onChatSelect, selectedChat }) => {
+
+const Friends = ({ socket, 
+  searchTerm = "", 
+  onChatSelect, 
+  selectedChat,
+  onOpenSakha, 
+
+}) => {
   console.log("Friends search:", searchTerm);
   const [friendsList, setFriendList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -121,6 +127,27 @@ useEffect(() => {
     <div className="relative flex flex-col h-full">
       {/* Friends List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scroll">
+        {/* ai sakha */}
+       <div
+        onClick={onOpenSakha}
+        className="flex items-center gap-3 p-3 rounded-2xl transition cursor-pointer hover:bg-purple-950/30 border border-purple-500/20 mb-2"
+       >
+          <div className="w-12 h-12 rounded-full bg-purple-950/50 
+                  border border-purple-500/40 flex items-center 
+                  justify-center text-2xl">
+    🤖
+  </div>
+   <div className="flex-1 min-w-0">
+    <h4 className="text-sm font-medium text-white">
+      सखा
+    </h4>
+        <p className="text-xs text-purple-400 truncate">
+      Your AI Assistant
+    </p>
+      </div>
+       <span className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-pulse" />
+       </div>
+
         {filteredFriends.length > 0 ? (
           filteredFriends.map((friend) => {
             const isSelected = selectedChat?._id === friend._id;
@@ -165,14 +192,6 @@ useEffect(() => {
             <p>No friends found</p>
           </div>
         )}
-      </div>
-
-     
-   
-
-      {/* Floating AI Button */}
-      <div className="absolute bottom-1 right-6 z-10">
-        <Ai />
       </div>
     </div>
   );

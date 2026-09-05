@@ -1,11 +1,13 @@
 import React, { useRef, useEffect, useState } from "react";
 import Chatleft from "./Chatleft";
 import Chatright from "./Chatright";
+import SakhaChat from "./SakhaChat";
 
 const Chat = () => {
   const [selectedChat, setSelectedChat] = useState(null);
 
 const [socket, setSocket] = useState(null);
+const [isSakhaOpen, setIsSakhaOpen] = useState(false);
 
 useEffect(() => {
   const ws = new WebSocket("ws://localhost:3000");
@@ -63,12 +65,15 @@ ws.onopen = () => {
 
 
   const handleChatSelect = (chat) => {
-    setSelectedChat(chat);
+     setIsSakhaOpen(false);
+  setSelectedChat(chat);
   };
 
   const handleBackToList = () => {
     setSelectedChat(null);
+     setIsSakhaOpen(false);
   };
+
 
   return (
     <div className="h-screen w-full bg-black overflow-hidden">
@@ -78,21 +83,25 @@ ws.onopen = () => {
         {/* ==================== LEFT SIDEBAR (Contacts) ==================== */}
         {/* Changed 'hidden md:flex' to mirror the exact panel rules */}
         <div className={`w-full md:w-80 lg:w-96 md:border-r border-zinc-700/60 flex-shrink-0
-                        ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+                    ${(selectedChat|| isSakhaOpen) ? 'hidden md:flex' : 'flex'}`}>
           <Chatleft 
             socket={socket}
-            onChatSelect={setSelectedChat} 
+            onChatSelect={handleChatSelect} 
             selectedChat={selectedChat}
             // Set this to true! On mobile (under md), the back button will hide/show correctly.
-            showBackButton={!!selectedChat}
+            showBackButton={!!selectedChat || isSakhaOpen}
+            onOpenSakha={() => setIsSakhaOpen(true)}
           />
         </div>
 
         {/* ==================== RIGHT CHAT AREA ==================== */}
         <div className={`flex-1 flex flex-col min-h-0 overflow-hidden
-                        ${selectedChat ? 'flex' : 'hidden md:flex'}`}>
+                        ${(selectedChat || isSakhaOpen)? 'flex' : 'hidden md:flex'}`}>
           
-          {selectedChat ? (
+          {isSakhaOpen ? (
+  <SakhaChat  onBack={handleBackToList} />
+) : selectedChat ? (
+
             <Chatright 
               socket={socket}
               selectedChat={selectedChat} 
