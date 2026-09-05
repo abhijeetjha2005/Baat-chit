@@ -55,11 +55,14 @@ const handleSubmit = async (e) => {
       navigate("/chat");
     }
   } catch (error) {
-    console.error("LOGIN ERROR:", error);
+     console.log("LOGIN ERROR:", error);
+  console.log("STATUS:", error.response?.status);
+  console.log("DATA:", error.response?.data);
 
-    setError(
-      error.response?.data?.message || "Login failed"
-    );
+  setError(
+    error.response?.data?.message ||
+    `Login failed (${error.response?.status || "network error"})`
+  );
   } finally {
     setLoading(false);
   }
