@@ -231,7 +231,7 @@ const forgotPassword = async (req, res) => {
       { expiresIn: "15m" }
     );
   
-    const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
+    const resetUrl = `https://baat-chit-bcd1.vercel.app/reset-password?token=${resetToken}`;
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
