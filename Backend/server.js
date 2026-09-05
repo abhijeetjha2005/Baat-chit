@@ -22,6 +22,9 @@ fs.mkdirSync(path.join(__dirname, "uploads/audio"), {
   recursive: true,
 });
 
+fs.mkdirSync(path.join(__dirname, "uploads/files"), {
+  recursive: true,
+});
 // Initialize WebSocket Server
 setupWebSocket(server);
 

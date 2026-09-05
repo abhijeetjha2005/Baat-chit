@@ -313,7 +313,89 @@ const { receiverId, audioUrl } = data;
 
   return;
 }
+/* ================= SEND FILE ================= */
 
+if (data.type === "send_file") {
+  console.log("SEND FILE:", data);
+
+  const senderId = ws.userId;
+
+  const {
+    receiverId,
+    fileUrl,
+    fileName,
+    fileType,
+    fileSize,
+  } = data;
+
+  // Find conversation
+  let conversation = await Conversation.findOne({
+    participants: { $all: [senderId, receiverId] },
+    isGroup: false,
+  });
+
+  // Create conversation if it doesn't exist
+  if (!conversation) {
+    conversation = await Conversation.create({
+      participants: [senderId, receiverId],
+      isGroup: false,
+    });
+  }
+
+  // Save file message
+  const savedMessage = await Message.create({
+    conversationId: conversation._id,
+    sender: senderId,
+
+    messageType: "file",
+
+    fileUrl,
+    fileName,
+    fileType,
+    fileSize,
+  });
+
+  // Update last message
+  conversation.lastMessage = savedMessage._id;
+  await conversation.save();
+
+  // Prepare WebSocket response
+  const messageData = {
+    type: "receive_message",
+
+    conversationId: conversation._id,
+
+    message: {
+      _id: savedMessage._id,
+      conversationId: savedMessage.conversationId,
+      sender: savedMessage.sender,
+
+      messageType: savedMessage.messageType,
+
+      fileUrl: savedMessage.fileUrl,
+      fileName: savedMessage.fileName,
+      fileType: savedMessage.fileType,
+      fileSize: savedMessage.fileSize,
+
+      createdAt: savedMessage.createdAt,
+    },
+  };
+
+  // Send to receiver
+  const receiverSocket = activeUsers.get(receiverId.toString());
+
+  if (
+    receiverSocket &&
+    receiverSocket.readyState === WebSocket.OPEN
+  ) {
+    receiverSocket.send(JSON.stringify(messageData));
+  }
+
+  // Send back to sender
+  ws.send(JSON.stringify(messageData));
+
+  return;
+}
       } catch (err) {
         console.error("WebSocket message processing error:", err.message);
 

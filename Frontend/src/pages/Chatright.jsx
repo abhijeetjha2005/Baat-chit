@@ -38,6 +38,7 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   // 1. Get logged-in user and normalize ID
   const currentUser = useMemo(() => {
     try {
@@ -132,7 +133,12 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
               id: msg._id,
               text: msg.text || "",
               audioUrl: msg.audioUrl || null,
-              type: msg.messageType === "voice" ? "voice" : "text",
+                fileUrl: msg.fileUrl || null,
+                fileName: msg.fileName || null,
+               fileType: msg.fileType || null,
+               fileSize: msg.fileSize || null,
+              type: msg.messageType||"text",
+
               sender: senderId === currentUserId ? "me" : "friend",
 
               time: new Date(msg.createdAt).toLocaleTimeString([], {
@@ -222,7 +228,11 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
           id: msg._id,
           text: msg.text || "",
           audioUrl: msg.audioUrl || null,
-          type: msg.messageType === "voice" ? "voice" : "text",
+            fileUrl: msg.fileUrl || null,
+        fileName: msg.fileName || null,
+        fileType: msg.fileType || null,
+          fileSize: msg.fileSize || null,
+           type: msg.messageType || "text",
           sender: msgSenderId === currentUserId ? "me" : "friend",
           time: new Date(
             msg.createdAt || Date.now()
@@ -362,9 +372,97 @@ const ChatRight = ({ socket, selectedChat, onBack }) => {
       );
     }, 1000);
   };
+//  files
+  const handleFileChange=(e)=>{
+   const file=e.target.files?.[0];
+   if(!file){
+    return;
 
+   } 
+     const allowedTypes = [
+    "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "text/plain",
+
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+  "application/zip",
+  "application/x-zip-compressed",
+  ];
+    if (!allowedTypes.includes(file.type)) {
+    alert("This file type is not allowed.");
+    e.target.value = "";
+    return;
+  }
+    console.log("FILE SELECTED:", file);
+  console.log("FILE NAME:", file.name);
+  console.log("FILE TYPE:", file.type);
+  console.log("FILE SIZE:", file.size);
+    setSelectedFile(file);
+    e.target.value = "";
+  }
   // 7. Handle Sending Messages
   const handleSend = async () => {
+    // FILE MESSAGE
+if (selectedFile) {
+  try {
+    console.log("Uploading file:", selectedFile);
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    const token = localStorage.getItem("token");
+
+    const uploadResponse = await fetch(
+      "http://localhost:3000/api/upload/file",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    );
+
+    const uploadData = await uploadResponse.json();
+
+    console.log("FILE UPLOAD STATUS:", uploadResponse.status);
+    console.log("FILE UPLOAD RESPONSE:", uploadData);
+
+    if (!uploadResponse.ok) {
+      throw new Error(uploadData.message || "File upload failed");
+    }
+
+    const fileUrl = uploadData.fileUrl;
+
+    if (!fileUrl) {
+      throw new Error("Backend did not return fileUrl");
+    }
+
+    const payload = {
+      type: "send_file",
+      receiverId: receiverId,
+      fileUrl: fileUrl,
+      fileName: selectedFile.name,
+      fileType: selectedFile.type,
+      fileSize: selectedFile.size,
+    };
+
+    console.log("SENDING FILE MESSAGE:", payload);
+
+    socket.send(JSON.stringify(payload));
+
+    setSelectedFile(null);
+
+    return;
+  } catch (error) {
+    console.error("File sending error:", error);
+    alert("File could not be sent.");
+    return;
+  }
+}
     if (!receiverId) {
       alert("Please select a user.");
       return;
@@ -626,13 +724,34 @@ console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${active
                       : "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-none"
                   }`}
                 >
-                  {msg.type === "voice" ? (
-                    <audio controls
-                     src={`http://localhost:3000${msg.audioUrl}`}
-                     className="max-w-full" />
-                  ) : (
-                    msg.text
-                  )}
+                 {msg.type === "voice" ? (
+  <audio
+    controls
+    src={`http://localhost:3000${msg.audioUrl}`}
+    className="max-w-full"
+  />
+) : msg.type === "file" ? (
+  <div>
+    {msg.fileType?.startsWith("image/") ? (
+      <img
+        src={`http://localhost:3000${msg.fileUrl}`}
+        alt={msg.fileName}
+        className="max-w-full rounded-lg"
+      />
+    ) : (
+      <a
+        href={`http://localhost:3000${msg.fileUrl}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-300 underline"
+      >
+        📎 {msg.fileName}
+      </a>
+    )}
+  </div>
+) : (
+  msg.text
+)}
 
                   <span
                     className={`absolute bottom-0.5 right-1 text-[10px] select-none ${
@@ -653,7 +772,25 @@ console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${active
       {/* Input Area */}
       <div className="p-3 bg-zinc-900 border-t border-zinc-700 shrink-0">
         <div className="w-full bg-zinc-800 rounded-3xl border border-zinc-700 shadow-lg p-3">
-          <input type="file" ref={fileInputRef} className="hidden" multiple />
+            {selectedFile && (
+      <div className="flex items-center justify-between mb-3 p-3 bg-zinc-700 rounded-xl">
+        <span className="text-white text-sm">
+          📎 {selectedFile.name}
+        </span>
+
+        <button
+          onClick={() => setSelectedFile(null)}
+          className="text-red-400"
+        >
+          ✕
+        </button>
+      </div>
+    )}
+          <input type="file"
+           ref={fileInputRef} className="hidden" 
+            multiple
+          onChange={handleFileChange}
+           />
           <input
             type="file"
             ref={cameraInputRef}
@@ -722,6 +859,8 @@ console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${active
                 </button>
               </div>
             )}
+
+
             <textarea
               ref={textareaRef}
               value={message}
@@ -737,10 +876,11 @@ console.log("DELETE URL:", `http://localhost:3000/api/chat/conversation/${active
 
             <button
               onClick={handleSend}
-              disabled={!message.trim() && !recordedAudio}
+              disabled={!message.trim() && !recordedAudio && !selectedFile}
               className="p-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-zinc-700 disabled:text-zinc-400 text-zinc-900 rounded-2xl transition-all active:scale-95"
             >
               <Send size={26} />
+
             </button>
           </div>
         </div>

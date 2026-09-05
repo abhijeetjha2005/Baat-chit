@@ -18,13 +18,31 @@ default:null
   },
   messageType:{
     type:String,
-    enum:["text","voice"],
+    enum:["text","voice","file"],
     default:"text",
   },
   audioUrl:{
 type:String,
 default:null
-  },
+  },fileUrl:{
+  type:String,
+  default:null
+},
+
+fileName:{
+  type:String,
+  default:null
+},
+
+fileType:{
+  type:String,
+  default:null
+},
+
+fileSize:{
+  type:Number,
+  default:null
+},
 
 },
 
