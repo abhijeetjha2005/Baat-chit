@@ -126,7 +126,7 @@ Sakha displays the answer
 ### 1. Clone the repository
 
 ```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
+git clone https://github.com/abhijeetjha2005
 cd बात-चीत
 ```
 
@@ -236,6 +236,6 @@ Add screenshots of:
 
 ## 👨‍💻 Author
 
-**Abhijeet  Kumar Jha**
+Abhijeet  Kumar Jha
 
 Built as a full-stack project to learn and implement real-time communication, backend development, authentication, file handling, and LLM integration.
