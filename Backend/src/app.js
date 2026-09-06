@@ -16,7 +16,7 @@ app.set("trust proxy", 1);
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://baat-chit-bcd1.vercel.app",
+  "https://baat-chit-bcd1-2a8rugyvn-abhijeetjha2005s-projects.vercel.app",
 ];
 
 app.use(
