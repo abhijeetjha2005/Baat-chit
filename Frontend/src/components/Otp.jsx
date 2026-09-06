@@ -89,7 +89,7 @@ const Otp = ({ onResend }) => {
     try {
 
       const response = await axios.post(
-        "https://baat-chit-2269.onrender.com/api/auth/register",
+          "https://baat-chit-2269.onrender.com/api/auth/register",
         {
           name: formData.fullName,
           email: formData.email,
