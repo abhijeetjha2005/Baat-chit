@@ -1,5 +1,4 @@
 const express = require("express");
-
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
@@ -11,17 +10,30 @@ const sakhaRoutes = require("./routes/sakha.routes");
 
 const app = express();
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://baat-chit-bcd1.vercel.app",
+];
 
 app.use(
   cors({
-    origin:[
-    "http://localhost:5173",
-    "https://baat-chit-bcd1-dypi1xb4n-abhijeetjha2005s-projects.vercel.app",
-    ],
-     credentials: true,
+    origin: function (origin, callback) {
+      // Allow requests without origin (Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      // Allow localhost and all your Vercel deployments
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith("-abhijeetjha2005s-projects.vercel.app")
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
   })
 );
-
 
 app.use(express.json());
 app.use(cookieParser());
