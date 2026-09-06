@@ -1,16 +1,14 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
-
+const nodemailer = require('nodemailer');
 const OTP = require('../models/otp.models');
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // 1. SEND OTP VIA EMAIL
 
 const sendOtp = async (req, res) => {
   try {
-    let { email } = req.body;
+    const { email } = req.body;
 
     if (!email) {
       return res.status(400).json({
@@ -19,67 +17,63 @@ const sendOtp = async (req, res) => {
       });
     }
 
-    email = email.trim().toLowerCase();
-
-    if (!process.env.RESEND_API_KEY) {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
       return res.status(500).json({
         success: false,
-        message: "Email service is not configured",
+        message: "Email credentials are missing in .env",
       });
     }
 
     // Generate OTP
-    const otpCode = Math.floor(
-      100000 + Math.random() * 900000
-    ).toString();
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Delete previous OTP
     await OTP.findOneAndDelete({ email });
 
-    // Send email FIRST
-    const { data, error } = await resend.emails.send({
-      from: "Baat-Chit <onboarding@resend.dev>",
-      to: [email],
-      subject: "OTP Verification - Baat-Chit",
-      html: `
-        <div style="font-family: Arial, sans-serif;">
-          <h2>Email Verification</h2>
-          <p>Your OTP is:</p>
-          <h1>${otpCode}</h1>
-          <p>This OTP is valid for 10 minutes.</p>
-        </div>
-      `,
-    });
-
-    if (error) {
-      console.error("Resend Error:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send OTP email",
-      });
-    }
-
-    // Save OTP only after email is successfully sent
+    // Save new OTP
     await OTP.create({
       email,
       otp: otpCode,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     });
 
-    console.log("OTP email sent:", data);
+    // Create transporter
+   const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+    // Verify transporter
+    await transporter.verify();
+
+    // Send email
+    await transporter.sendMail({
+      from: `"Baat-Chit" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "OTP Verification",
+      text: `Your OTP is ${otpCode}. It is valid for 10 minutes.`,
+      html: `
+        <h2>Email Verification</h2>
+        <p>Your OTP is:</p>
+        <h1>${otpCode}</h1>
+        <p>This OTP is valid for 10 minutes.</p>
+      `,
+    });
 
     return res.status(200).json({
       success: true,
       message: "OTP sent successfully",
     });
-
   } catch (error) {
     console.error("Send OTP Error:", error);
-
     return res.status(500).json({
       success: false,
-      message: "Failed to send OTP",
+      message: error.message,
     });
   }
 };
@@ -241,76 +235,41 @@ const forgotPassword = async (req, res) => {
   
     const resetUrl = `https://baat-chit-bcd1.vercel.app/reset-password?token=${resetToken}`;
 
- const { data, error } = await resend.emails.send({
-  from: "Baat-Chit Security <onboarding@resend.dev>",
-  to: [email],
-  subject: "Reset your Password - Baat-Chit",
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
 
-  html: `
-    <div style="
-      font-family: Arial, sans-serif;
-      max-width: 500px;
-      margin: auto;
-      padding: 20px;
-      border: 1px solid #e4e4e7;
-      border-radius: 12px;
-    ">
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
-      <h2 style="color: #10b981; text-align: center;">
-        बात-चीत
-      </h2>
+    await transporter.verify();
 
-      <h3 style="color: #1f2937;">
-        Reset Your Password
-      </h3>
-
-      <p style="color: #4b5563;">
-        We received a request to reset your password.
-        Click the button below to create a new password.
-      </p>
-
-      <div style="text-align: center; margin: 30px 0;">
-
-        <a
-          href="${resetUrl}"
-          style="
-            background-color: #10b981;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: bold;
-          "
-        >
-          Reset Password
-        </a>
-
-      </div>
-
-      <p style="color: #9ca3af; font-size: 12px;">
-        This link is valid for 15 minutes.
-      </p>
-
-      <p style="color: #9ca3af; font-size: 12px;">
-        If you did not request this, you can safely ignore this email.
-      </p>
-
-    </div>
-  `,
-});
-
-if (error) {
-  console.error("Resend Error:", error);
-
-  return res.status(500).json({
-    success: false,
-    message: "Failed to send reset email",
-  });
-}
-
-console.log("Reset email sent:", data);
-
-   
+    // Send reset email
+    await transporter.sendMail({
+      from: `"Baat-Chit Security" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Reset your Password - Baat-Chit",
+      text: `Click the link to reset your password: ${resetUrl}. This link is valid for 15 minutes.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 20px; border: 1px solid #e4e4e7; border-radius: 12px;">
+          <h2 style="color: #10b981; text-align: center;">बात-चीत</h2>
+          <h3 style="color: #1f2937;">Reset Your Password</h3>
+          <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
+            We received a request to reset your password. Click the button below to set up a new password. This link is valid for 15 minutes.
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+              Reset Password
+            </a>
+          </div>
+          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+            If you did not request this, you can safely ignore this email.
+          </p>
+        </div>
+      `
+    });
 
     return res.status(200).json({
       success: true,
