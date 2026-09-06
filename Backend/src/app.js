@@ -33,7 +33,7 @@ app.use(
         return callback(null, true);
       }
 
-      // Allow all Vercel preview deployments of this project
+      // Allow Vercel preview deployments
       if (
         /^https:\/\/baat-chit-bcd1-[a-z0-9-]+\.vercel\.app$/.test(origin)
       ) {
@@ -48,19 +48,6 @@ app.use(
     credentials: true,
   })
 );
-
-// Handle CORS errors
-app.use((err, req, res, next) => {
-  if (err.message === "Not allowed by CORS") {
-    console.warn("Blocked by CORS:", req.headers.origin);
-
-    return res.status(403).json({
-      error: "CORS not allowed for this origin",
-    });
-  }
-
-  next(err);
-});
 
 // Middleware
 app.use(express.json());

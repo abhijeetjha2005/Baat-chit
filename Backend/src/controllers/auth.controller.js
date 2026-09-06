@@ -1,14 +1,29 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/user.model');
-const nodemailer = require('nodemailer');
-const OTP = require('../models/otp.models');
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("../models/user.model");
+const OTP = require("../models/otp.models");
 
-// 1. SEND OTP VIA EMAIL
+const { Resend } = require("resend");
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+
+// ===============================
+// EMAIL CONFIGURATION
+// ===============================
+
+// For testing with Resend's test sender:
+// Change this later after verifying your own domain.
+const FROM_EMAIL = "Baat-Chit <onboarding@resend.dev>";
+
+
+// ===============================
+// 1. SEND OTP
+// ===============================
 
 const sendOtp = async (req, res) => {
   try {
-    const { email } = req.body;
+    let { email } = req.body;
 
     if (!email) {
       return res.status(400).json({
@@ -17,18 +32,25 @@ const sendOtp = async (req, res) => {
       });
     }
 
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!process.env.RESEND_API_KEY) {
       return res.status(500).json({
         success: false,
-        message: "Email credentials are missing in .env",
+        message: "Resend API key is missing",
       });
     }
 
-    // Generate OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    email = email.trim().toLowerCase();
 
-    // Delete previous OTP
+
+    // Generate 6 digit OTP
+    const otpCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+
+    // Delete old OTP
     await OTP.findOneAndDelete({ email });
+
 
     // Save new OTP
     await OTP.create({
@@ -37,236 +59,439 @@ const sendOtp = async (req, res) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     });
 
-    // Create transporter
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
 
-    // Send email (verify() removed — sendMail already surfaces auth/connection errors,
-    // and skipping it saves a full extra round-trip to Gmail on every request)
-    await transporter.sendMail({
-      from: `"Baat-Chit" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "OTP Verification",
-      text: `Your OTP is ${otpCode}. It is valid for 10 minutes.`,
+    // Send email using Resend
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [email],
+      subject: "Your Baat-Chit OTP Verification",
       html: `
-        <h2>Email Verification</h2>
-        <p>Your OTP is:</p>
-        <h1>${otpCode}</h1>
-        <p>This OTP is valid for 10 minutes.</p>
+        <div style="
+          font-family: Arial, sans-serif;
+          max-width: 500px;
+          margin: auto;
+          padding: 30px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+        ">
+
+          <h2 style="
+            text-align: center;
+            color: #10b981;
+          ">
+            बात-चीत
+          </h2>
+
+          <h3>Email Verification</h3>
+
+          <p>
+            Your OTP verification code is:
+          </p>
+
+          <div style="
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            color: #10b981;
+            padding: 20px;
+          ">
+            ${otpCode}
+          </div>
+
+          <p>
+            This OTP is valid for 10 minutes.
+          </p>
+
+          <p style="
+            color: #6b7280;
+            font-size: 13px;
+          ">
+            Do not share this OTP with anyone.
+          </p>
+
+        </div>
       `,
     });
+
+
+    if (error) {
+      console.error("Resend Error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Failed to send OTP",
+      });
+    }
+
+
+    console.log("OTP Email Sent:", data);
+
 
     return res.status(200).json({
       success: true,
       message: "OTP sent successfully",
     });
+
   } catch (error) {
     console.error("Send OTP Error:", error);
+
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Failed to send OTP",
     });
   }
 };
 
 
-// 2. REGISTER USER (EMAIL ONLY)
+// ===============================
+// 2. REGISTER USER
+// ===============================
 
 const registerUser = async (req, res) => {
   try {
-    let { name, email, password, confirmPassword, otp } = req.body;
-    
-    // 1. Structural Validation
+
+    let {
+      name,
+      email,
+      password,
+      confirmPassword,
+      otp
+    } = req.body;
+
+
+    // Validation
     if (!name || !email || !password || !confirmPassword || !otp) {
-      return res.status(400).json({ success: false, message: "All fields are required" }); 
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
     }
+
 
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 6 characters."
+        message: "Password must be at least 6 characters",
       });
     }
 
+
     if (password !== confirmPassword) {
-      return res.status(400).json({ success: false, message: "Passwords do not match" });
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
+      });
     }
 
-    name = name.trim();
-    email = email.trim().toLowerCase();    
 
-    // 2. Verify Security Tokens (OTP)
+    name = name.trim();
+    email = email.trim().toLowerCase();
+
+
+    // Find OTP
     const otpRecord = await OTP.findOne({ email });
+
 
     if (!otpRecord) {
       return res.status(400).json({
         success: false,
-        message: "OTP not found"
+        message: "OTP not found",
       });
     }
 
+
+    // Check expiration
     if (otpRecord.expiresAt < new Date()) {
+
+      await OTP.deleteOne({ email });
+
       return res.status(400).json({
         success: false,
-        message: "OTP has expired"
+        message: "OTP has expired",
       });
     }
 
+
+    // Check OTP
     if (otpRecord.otp !== otp) {
       return res.status(400).json({
         success: false,
-        message: "Invalid OTP"
+        message: "Invalid OTP",
       });
     }
 
-    // OTP is correct, remove it
-    await OTP.deleteOne({ email });
-    
-    // 3. Check Account Availability
+
+    // Check existing user BEFORE deleting OTP
     const existingUser = await User.findOne({ email });
+
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: "User with this email already exists"
+        message: "User with this email already exists",
       });
     }
-    
-    // 4. Encrypt and Commit Record
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    
-    const user = await User.create({ 
+
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+
+    // Create user
+    const user = await User.create({
       name,
       email,
-      password: hashedPassword 
+      password: hashedPassword,
     });
+
+
+    // Delete OTP
+    await OTP.deleteOne({ email });
+
 
     return res.status(201).json({
       success: true,
       message: "Registration successful",
-      user: { id: user._id, name: user.name, email: user.email }
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
     });
-    
+
   } catch (error) {
-    console.error("Register error", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+
+    console.error("Register Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };
 
 
-// 3. LOGIN (EMAIL ONLY)
+// ===============================
+// 3. LOGIN
+// ===============================
 
 const login = async (req, res) => {
   try {
+
     let { email, password } = req.body;
+
+
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required." });
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
     }
-    
+
+
     email = email.trim().toLowerCase();
 
-    // Fetch user by email
+
     const user = await User.findOne({ email });
+
+
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password." });
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
     }
-    
-    // Checking password with hashed password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid email or password." });
-    }
-    
-    // Generate token
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '2h' }
+
+
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.password
     );
-    
+
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+
+    const token = jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "2h",
+      }
+    );
+
+
     return res.status(200).json({
+      success: true,
       message: "Login successful",
       token,
-      user: { id: user._id, email: user.email }
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
     });
-    
+
   } catch (error) {
-    console.error("Backend Login Error:", error);
-    return res.status(500).json({ message: "An unexpected error occurred." });
+
+    console.error("Login Error:", error);
+
+    return res.status(500).json({
+      message: "An unexpected error occurred",
+    });
   }
 };
 
 
+// ===============================
 // 4. FORGOT PASSWORD
+// ===============================
 
 const forgotPassword = async (req, res) => {
   try {
+
     let { email } = req.body;
+
+
     if (!email) {
-      return res.status(400).json({ success: false, message: "Email is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
     }
+
+
     email = email.trim().toLowerCase();
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "No account found with this email address." 
-      });
-    }    
 
+    const user = await User.findOne({ email });
+
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email",
+      });
+    }
+
+
+    // Create reset token
     const resetToken = jwt.sign(
       {
         id: user._id,
         email: user.email,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      {
+        expiresIn: "15m",
+      }
     );
-  
-    const resetUrl = `https://baat-chit-bcd1.vercel.app/reset-password?token=${resetToken}`;
 
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
 
-    // Send reset email (verify() removed — see note in sendOtp above)
-    await transporter.sendMail({
-      from: `"Baat-Chit Security" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Reset your Password - Baat-Chit",
-      text: `Click the link to reset your password: ${resetUrl}. This link is valid for 15 minutes.`,
+    // IMPORTANT: Normal URL string
+    const resetUrl =
+      `https://baat-chit-bcd1.vercel.app/reset-password?token=${resetToken}`;
+
+
+    // Send email using Resend
+    const { data, error } = await resend.emails.send({
+
+      from: FROM_EMAIL,
+
+      to: [email],
+
+      subject: "Reset Your Password - Baat-Chit",
+
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 20px; border: 1px solid #e4e4e7; border-radius: 12px;">
-          <h2 style="color: #10b981; text-align: center;">बात-चीत</h2>
-          <h3 style="color: #1f2937;">Reset Your Password</h3>
-          <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
-            We received a request to reset your password. Click the button below to set up a new password. This link is valid for 15 minutes.
+        <div style="
+          font-family: Arial, sans-serif;
+          max-width: 500px;
+          margin: auto;
+          padding: 30px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+        ">
+
+          <h2 style="
+            color: #10b981;
+            text-align: center;
+          ">
+            बात-चीत
+          </h2>
+
+
+          <h3>Reset Your Password</h3>
+
+
+          <p style="
+            color: #4b5563;
+            line-height: 1.6;
+          ">
+            We received a request to reset your password.
           </p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${resetUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+
+
+          <div style="
+            text-align: center;
+            margin: 30px 0;
+          ">
+
+            <a
+              href="${resetUrl}"
+
+              style="
+                background-color: #10b981;
+                color: white;
+                padding: 14px 25px;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: bold;
+              "
+            >
               Reset Password
             </a>
+
           </div>
-          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-            If you did not request this, you can safely ignore this email.
+
+
+          <p style="
+            color: #6b7280;
+          ">
+            This link is valid for 15 minutes.
           </p>
+
+
+          <p style="
+            color: #9ca3af;
+            font-size: 12px;
+          ">
+            If you did not request this password reset,
+            you can safely ignore this email.
+          </p>
+
         </div>
-      `
+      `,
     });
+
+
+    if (error) {
+
+      console.error("Resend Error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send reset email",
+      });
+    }
+
+
+    console.log("Reset Email Sent:", data);
+
 
     return res.status(200).json({
       success: true,
@@ -274,87 +499,123 @@ const forgotPassword = async (req, res) => {
     });
 
   } catch (error) {
+
     console.error("Forgot Password Error:", error);
-    return res.status(500).json({ 
-      success: false, 
-      message: "Failed to send reset email. Try again later." 
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send reset email",
     });
   }
 };
 
 
-// 5. APPLY NEW PASSWORD
+// ===============================
+// 5. RESET PASSWORD
+// ===============================
 
 const resetPassword = async (req, res) => {
   try {
-    const { token, password, confirmPassword } = req.body;
-    
-    // 1. Structural Validation (FIXED: Length checking shifted directly to early fail points)
+
+    const {
+      token,
+      password,
+      confirmPassword
+    } = req.body;
+
+
     if (!token || !password || !confirmPassword) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "All fields (token, password, confirmPassword) are required." 
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
       });
     }
+
 
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 6 characters."
+        message: "Password must be at least 6 characters",
       });
     }
+
 
     if (password !== confirmPassword) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Passwords do not match." 
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
       });
     }
 
-    // 2. Decode Identity Token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // 3. Fetch Matching User Identity
+
+    // Verify token
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET
+    );
+
+
     const user = await User.findById(decoded.id);
+
+
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found." 
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
-    // 4. Hash and Persist New Credentials
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(
+      password,
+      10
+    );
+
 
     user.password = hashedPassword;
+
     await user.save();
+
 
     return res.status(200).json({
       success: true,
-      message: "Password reset successful! You can now log in with your new password.",
+      message: "Password reset successful! You can now log in.",
     });
 
   } catch (error) {
+
     console.error("Reset Password Error:", error);
 
+
     if (error.name === "TokenExpiredError") {
-      return res.status(400).json({ 
-        success: false, 
-        message: "The reset link has expired. Please request a new one." 
+      return res.status(400).json({
+        success: false,
+        message: "The reset link has expired",
       });
     }
+
+
     if (error.name === "JsonWebTokenError") {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid reset link/token." 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid reset link",
       });
     }
-    return res.status(500).json({ 
-      success: false, 
-      message: "An unexpected error occurred while resetting your password." 
+
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
     });
   }
 };
 
-module.exports = { sendOtp, registerUser, login, forgotPassword, resetPassword };
+
+module.exports = {
+  sendOtp,
+  registerUser,
+  login,
+  forgotPassword,
+  resetPassword,
+};
