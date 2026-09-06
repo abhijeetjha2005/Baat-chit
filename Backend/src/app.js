@@ -10,6 +10,10 @@ const sakhaRoutes = require("./routes/sakha.routes");
 
 const app = express();
 
+// Render sits behind a reverse proxy — trust the first hop so
+// X-Forwarded-For is read correctly (needed by express-rate-limit, req.ip, etc.)
+app.set("trust proxy", 1);
+
 const allowedOrigins = [
   "http://localhost:5173",
   "https://baat-chit-bcd1.vercel.app",
