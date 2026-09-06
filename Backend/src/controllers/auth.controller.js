@@ -39,20 +39,17 @@ const sendOtp = async (req, res) => {
 
     // Create transporter
     const transporter = nodemailer.createTransport({
-   host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  family:4,
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
     });
 
-    // Verify transporter
-    await transporter.verify();
-
-    // Send email
+    // Send email (verify() removed — sendMail already surfaces auth/connection errors,
+    // and skipping it saves a full extra round-trip to Gmail on every request)
     await transporter.sendMail({
       from: `"Baat-Chit" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -238,18 +235,15 @@ const forgotPassword = async (req, res) => {
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  family:4,
+      port: 465,
+      secure: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
     });
 
-    await transporter.verify();
-
-    // Send reset email
+    // Send reset email (verify() removed — see note in sendOtp above)
     await transporter.sendMail({
       from: `"Baat-Chit Security" <${process.env.EMAIL_USER}>`,
       to: email,
