@@ -41,7 +41,7 @@ const sendOtp = async (req, res) => {
     const transporter = nodemailer.createTransport({
    host: "smtp.gmail.com",
   port: 465,
-  secure: false,
+  secure: true,
   family:4,
       auth: {
         user: process.env.EMAIL_USER,
@@ -239,7 +239,7 @@ const forgotPassword = async (req, res) => {
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
   port: 465,
-  secure: false,
+  secure: true,
   family:4,
       auth: {
         user: process.env.EMAIL_USER,

@@ -43,37 +43,37 @@ const SignUp = () => {
       return;
     }
 
-    setLoading(true);
+setLoading(true);
+try {
+  console.log("1. Sending OTP request...");
 
-    try {
-      const response =await axios.post(  "https://baat-chit-2269.onrender.com/api/auth/send-otp",
-          {
+  const response = await axios.post(
+    "https://baat-chit-2269.onrender.com/api/auth/send-otp",
+    {
       name: formData.fullName,
       email: formData.email,
       password: formData.password,
       confirmPassword: formData.confirmPassword,
-    },{
-         withCredentials: true, 
-    }
+    },
+    { withCredentials: true }
+  );
 
-      )
+  if (response.data.success === true) {
+    navigate("/otp", { state: formData });
+  } else {
+    setError(response.data.message || "Failed to send OTP");
+  }
+} catch (err) {
+  setError(
+    err.response?.data?.message ||
+    err.message ||
+    "Something went wrong"
+  );
+} finally {
+  setLoading(false);
+} 
 
-      const data = response.data;
-      
-
-      if (data.success) {
-        alert("🎉 Account created successfully!");
-        navigate('/otp',{
-            state: formData,
-        });
-      } else {
-        setError(data.message || "Failed to create account");
-      }
-    } catch (err) {
-      setError(err.response?.data?.message ||"Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  
   };
 
   return (
