@@ -10,50 +10,70 @@ const sakhaRoutes = require("./routes/sakha.routes");
 
 const app = express();
 
-// Render sits behind a reverse proxy — trust the first hop so
-// X-Forwarded-For is read correctly (needed by express-rate-limit, req.ip, etc.)
+// Render is behind a reverse proxy
 app.set("trust proxy", 1);
 
+// Allowed origins
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://baat-chit-bcd1-2a8rugyvn-abhijeetjha2005s-projects.vercel.app",
+  "https://baat-chit-bcd1.vercel.app",
 ];
 
+// CORS configuration
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
+      // Allow requests without origin
+      if (!origin) {
+        return callback(null, true);
+      }
 
+      // Allow localhost and production domain
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow all Vercel preview deployments of this project
       if (
-        allowedOrigins.includes(origin) ||
-        origin.endsWith("https://baat-chit-bcd1-7njienh6r-abhijeetjha2005s-projects.vercel.app")
+        /^https:\/\/baat-chit-bcd1-[a-z0-9-]+\.vercel\.app$/.test(origin)
       ) {
         return callback(null, true);
       }
 
+      console.log("Blocked by CORS:", origin);
+
       return callback(new Error("Not allowed by CORS"));
     },
+
     credentials: true,
   })
 );
 
-// Catch CORS errors and respond cleanly instead of an unhandled crash trace
+// Handle CORS errors
 app.use((err, req, res, next) => {
   if (err.message === "Not allowed by CORS") {
     console.warn("Blocked by CORS:", req.headers.origin);
-    return res.status(403).json({ error: "CORS not allowed for this origin" });
+
+    return res.status(403).json({
+      error: "CORS not allowed for this origin",
+    });
   }
+
   next(err);
 });
 
+// Middleware
 app.use(express.json());
 app.use(cookieParser());
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/upload", uploadRoutes);
-app.use("/uploads", express.static("uploads"));
 app.use("/api/sakha", sakhaRoutes);
+
+// Static uploads
+app.use("/uploads", express.static("uploads"));
 
 module.exports = app;
