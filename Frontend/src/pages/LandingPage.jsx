@@ -1,77 +1,84 @@
-import React,{useState} from "react";
-import axios from "axios"
+import React, { useState } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Logo from "../components/Logo";
 
 const LandingPage = () => {
   const navigate = useNavigate();
 
-const[formData,setFormData]=useState({
-email:"",
-password:""
-})
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-const handleChange =(e)=>{
-  setFormData({
-    ...formData,
-    [e.target.name]:e.target.value,
-})
-}
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  try {
-    setLoading(true);
+    setError("");
 
-    const response = await axios.post(
-      "https://baat-chit-2269.onrender.com/api/auth/login",
-      {
-        email: formData.email,
-        password: formData.password,
-      },
-      {
-        withCredentials: true,
+    console.log("LOGIN BUTTON CLICKED");
+
+    try {
+      setLoading(true);
+
+      const response = await axios.post(
+        "https://baat-chit-2269.onrender.com/api/auth/login",
+        {
+          email: formData.email,
+          password: formData.password,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+
+      console.log("LOGIN RESPONSE:", response.data);
+
+      if (response.data.token && response.data.user) {
+        localStorage.setItem(
+          "user",
+          JSON.stringify(response.data.user)
+        );
+
+        localStorage.setItem(
+          "token",
+          response.data.token
+        );
+
+        navigate("/chat");
+      } else {
+        setError("Login response is missing token or user data.");
       }
-    );
 
-    console.log("LOGIN RESPONSE:", response.data);
+    } catch (error) {
+      console.log("LOGIN ERROR:", error);
+      console.log("STATUS:", error.response?.status);
+      console.log("DATA:", error.response?.data);
 
-    if (response.data.token && response.data.user) {
-      localStorage.setItem(
-        "user",
-        JSON.stringify(response.data.user)
+      setError(
+        error.response?.data?.message ||
+        `Login failed (${error.response?.status || "network error"})`
       );
 
-      localStorage.setItem(
-        "token",
-        response.data.token
-      );
-
-      navigate("/chat");
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-     console.log("LOGIN ERROR:", error);
-  console.log("STATUS:", error.response?.status);
-  console.log("DATA:", error.response?.data);
-
-  setError(
-    error.response?.data?.message ||
-    `Login failed (${error.response?.status || "network error"})`
-  );
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-black to-zinc-950 flex items-center justify-center px-4 py-8 sm:px-6">
       <div className="w-full max-w-md text-center">
-        
+
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <Logo />
@@ -88,21 +95,21 @@ const handleSubmit = async (e) => {
 
         {/* Sign In Card */}
         <div className="mt-10 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700 rounded-3xl p-6 sm:p-8 shadow-2xl">
-          
+
           <h2 className="text-2xl font-semibold text-white mb-8">
             Sign In
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
               placeholder="Email address"
-              className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl 
-                         text-white placeholder-zinc-500 focus:outline-none 
-                         focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              required
+              className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
             />
 
             <input
@@ -111,54 +118,58 @@ const handleSubmit = async (e) => {
               value={formData.password}
               onChange={handleChange}
               placeholder="Password"
-              className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl 
-                         text-white placeholder-zinc-500 focus:outline-none 
-                         focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              required
+              className="w-full px-5 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
             />
 
+            {error && (
+              <p className="text-red-500 text-sm text-center">
+                {error}
+              </p>
+            )}
 
-{error && (
-  <p className="text-red-500 text-sm text-center">
-    {error}
-  </p>
-)}
             <button
               type="submit"
-                disabled={loading}
-              className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 
-                         text-white font-semibold rounded-2xl transition-all duration-200 text-base"
+              disabled={loading}
+              className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-2xl transition-all duration-200 text-base disabled:opacity-50"
             >
-           {loading ? "Signing In..." : "Sign In"}
+              {loading ? "Signing In..." : "Sign In"}
             </button>
+
           </form>
-{/* forget password */}
-<div className="text-right">
-  <button
-    type="button"
-    onClick={() => navigate("/forgot-password")}
-    className="text-sm text-emerald-400 hover:text-emerald-500 hover:underline transition"
-  >
-    Forgot Password?
-  </button>
-</div>
 
+          {/* Forgot Password */}
+          <div className="text-right mt-3">
+            <button
+              type="button"
+              onClick={() => navigate("/forgot-password")}
+              className="text-sm text-emerald-400 hover:text-emerald-500 hover:underline transition"
+            >
+              Forgot Password?
+            </button>
+          </div>
 
-          {/* Sign Up Link */}
+          {/* Sign Up */}
           <div className="mt-8 text-sm text-zinc-400">
             Don't have an account?{" "}
+
             <button
+              type="button"
               onClick={() => navigate("/signup")}
               className="text-emerald-400 hover:text-emerald-500 font-medium hover:underline transition"
             >
               Sign Up
             </button>
+
           </div>
+
         </div>
 
-        {/* Optional Footer Text */}
+        {/* Footer */}
         <p className="text-xs text-zinc-500 mt-8">
           Secure • Private • Instant
         </p>
+
       </div>
     </div>
   );
