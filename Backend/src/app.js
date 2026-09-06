@@ -12,8 +12,7 @@ const sakhaRoutes = require("./routes/sakha.routes");
 const app = express();
 
 const allowedOrigins = [
-  "http://localhost:5173",
-  "https://baat-chit-bcd1.vercel.app",
+  "https://baat-chit-bcd1.vercel.app/",
 ];
 
 app.use(
