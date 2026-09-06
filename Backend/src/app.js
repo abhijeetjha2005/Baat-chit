@@ -26,7 +26,7 @@ app.use(
 
       if (
         allowedOrigins.includes(origin) ||
-        origin.endsWith("-abhijeetjha2005s-projects.vercel.app")
+        origin.endsWith("https://baat-chit-bcd1-7njienh6r-abhijeetjha2005s-projects.vercel.app")
       ) {
         return callback(null, true);
       }
