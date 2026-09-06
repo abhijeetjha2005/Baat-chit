@@ -1,4 +1,5 @@
 const express = require("express");
+
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
@@ -18,10 +19,8 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests without origin (Postman, etc.)
       if (!origin) return callback(null, true);
 
-      // Allow localhost and all your Vercel deployments
       if (
         allowedOrigins.includes(origin) ||
         origin.endsWith("-abhijeetjha2005s-projects.vercel.app")
@@ -31,6 +30,7 @@ app.use(
 
       return callback(new Error("Not allowed by CORS"));
     },
+
     credentials: true,
   })
 );
