@@ -14,8 +14,10 @@ const app = express();
 
 app.use(
   cors({
-    origin:
-    "https://baat-chit-bcd1.vercel.app",
+    origin:[
+    "http://localhost:5173",
+    "https://baat-chit-bcd1-dypi1xb4n-abhijeetjha2005s-projects.vercel.app",
+    ],
      credentials: true,
   })
 );
