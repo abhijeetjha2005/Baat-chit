@@ -37,6 +37,15 @@ app.use(
   })
 );
 
+// Catch CORS errors and respond cleanly instead of an unhandled crash trace
+app.use((err, req, res, next) => {
+  if (err.message === "Not allowed by CORS") {
+    console.warn("Blocked by CORS:", req.headers.origin);
+    return res.status(403).json({ error: "CORS not allowed for this origin" });
+  }
+  next(err);
+});
+
 app.use(express.json());
 app.use(cookieParser());
 
