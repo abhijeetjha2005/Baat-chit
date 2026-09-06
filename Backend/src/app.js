@@ -15,7 +15,7 @@ const app = express();
 app.use(
   cors({
     origin:
-    "https://baat-chit-bcd1.vercel.app/",
+    "https://baat-chit-bcd1.vercel.app",
      credentials: true,
   })
 );
