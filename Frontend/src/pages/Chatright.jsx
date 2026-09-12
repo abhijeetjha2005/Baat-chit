@@ -835,7 +835,7 @@ console.log("DELETE URL:", `https://baat-chit-2269.onrender.com/api/chat/convers
               
               {isRecording ? (
                 
-                <div className="flex items-center gap-2  bg-zinc-900 rounded-xl px-3 py-2 shrink-0">
+                <div className="flex items-center gap-1  bg-zinc-900 rounded-xl px-3 py-2 shrink-0">
                   {/* Recording indicator */}
                   <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
 
