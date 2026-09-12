@@ -797,7 +797,25 @@ console.log("DELETE URL:", `https://baat-chit-2269.onrender.com/api/chat/convers
             className="hidden"
             accept="image/*"
           />
+{/* AUDIO PREVIEW */}
+{recordedAudio && !isRecording && (
+  <div className="mb-3 flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-2xl p-3">
 
+    <audio
+      controls
+      src={recordedAudio}
+      className="w-full"
+    />
+
+    <button
+      onClick={deleteRecordedAudio}
+      className="shrink-0 px-3 py-2 text-red-400"
+    >
+      ✕
+    </button>
+
+  </div>
+)}
           <div className="flex items-end gap-3 bg-zinc-900 rounded-2xl border border-zinc-700/50 focus-within:border-emerald-500 p-3">
             <div className="flex gap-1 text-zinc-400">
               <button
@@ -814,7 +832,9 @@ console.log("DELETE URL:", `https://baat-chit-2269.onrender.com/api/chat/convers
               >
                 <Camera size={26} />
               </button>
+              
               {isRecording ? (
+                
                 <div className="flex items-center gap-3 flex-1 bg-zinc-900 rounded-xl px-3 py-2">
                   {/* Recording indicator */}
                   <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
@@ -847,18 +867,6 @@ console.log("DELETE URL:", `https://baat-chit-2269.onrender.com/api/chat/convers
               )}
             </div>
 
-            {recordedAudio && !isRecording && (
-              <div className="mb-3 flex items-center gap-3 bg-zinc-900 border border-zinc-700 rounded-2xl p-3">
-                <audio controls src={recordedAudio} className="flex-1" />
-
-                <button
-                  onClick={deleteRecordedAudio}
-                  className="px-3 py-2 text-red-400 hover:bg-zinc-800 rounded-lg"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
 
 
             <textarea
