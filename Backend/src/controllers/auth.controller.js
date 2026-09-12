@@ -3,23 +3,16 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 const OTP = require("../models/otp.models");
 
-const { Resend } = require("resend");
+const { BrevoClient } = require("@getbrevo/brevo");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-
-// ===============================
-// EMAIL CONFIGURATION
-// ===============================
-
-// For testing with Resend's test sender:
-// Change this later after verifying your own domain.
-const FROM_EMAIL = "Baat-Chit <onboarding@resend.dev>";
+const brevoClient = new BrevoClient({
+  apiKey: process.env.BREVO_API_KEY,
+});
 
 
-// ===============================
+
 // 1. SEND OTP
-// ===============================
+
 
 const sendOtp = async (req, res) => {
   try {
@@ -32,12 +25,7 @@ const sendOtp = async (req, res) => {
       });
     }
 
-    if (!process.env.RESEND_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        message: "Resend API key is missing",
-      });
-    }
+
 
     email = email.trim().toLowerCase();
 
@@ -61,71 +49,65 @@ const sendOtp = async (req, res) => {
 
 
     // Send email using Resend
-    const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: [email],
-      subject: "Your Baat-Chit OTP Verification",
-      html: `
-        <div style="
-          font-family: Arial, sans-serif;
-          max-width: 500px;
-          margin: auto;
-          padding: 30px;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-        ">
-
-          <h2 style="
-            text-align: center;
-            color: #10b981;
-          ">
-            बात-चीत
-          </h2>
-
-          <h3>Email Verification</h3>
-
-          <p>
-            Your OTP verification code is:
-          </p>
-
-          <div style="
-            text-align: center;
-            font-size: 32px;
-            font-weight: bold;
-            letter-spacing: 8px;
-            color: #10b981;
-            padding: 20px;
-          ">
-            ${otpCode}
-          </div>
-
-          <p>
-            This OTP is valid for 10 minutes.
-          </p>
-
-          <p style="
-            color: #6b7280;
-            font-size: 13px;
-          ">
-            Do not share this OTP with anyone.
-          </p>
-
-        </div>
-      `,
-    });
-
-
-    if (error) {
-      console.error("Resend Error:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: error.message || "Failed to send OTP",
-      });
+   // Send email using Brevo
+await apiInstance.sendTransacEmail({
+  sender: {
+    name: "Baat-Chit",
+    email: "abhijeethoshiyar100@gmail.com"
+  },
+  to: [
+    {
+      email: email
     }
+  ],
+  subject: "Your Baat-Chit OTP Verification",
+  htmlContent: `
+    <div style="
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: auto;
+      padding: 30px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+    ">
 
+      <h2 style="
+        text-align: center;
+        color: #10b981;
+      ">
+        बात-चीत
+      </h2>
 
-    console.log("OTP Email Sent:", data);
+      <h3>Email Verification</h3>
+
+      <p>Your OTP verification code is:</p>
+
+      <div style="
+        text-align: center;
+        font-size: 32px;
+        font-weight: bold;
+        letter-spacing: 8px;
+        color: #10b981;
+        padding: 20px;
+      ">
+        ${otpCode}
+      </div>
+
+      <p>This OTP is valid for 10 minutes.</p>
+
+      <p style="
+        color: #6b7280;
+        font-size: 13px;
+      ">
+        Do not share this OTP with anyone.
+      </p>
+
+    </div>
+  `
+});
+
+console.log("OTP Email Sent Successfully");
+
 
 
     return res.status(200).json({
@@ -144,9 +126,9 @@ const sendOtp = async (req, res) => {
 };
 
 
-// ===============================
+
 // 2. REGISTER USER
-// ===============================
+
 
 const registerUser = async (req, res) => {
   try {
@@ -271,9 +253,9 @@ const registerUser = async (req, res) => {
 };
 
 
-// ===============================
+
 // 3. LOGIN
-// ===============================
+
 
 const login = async (req, res) => {
   try {
@@ -348,9 +330,8 @@ const login = async (req, res) => {
 };
 
 
-// ===============================
 // 4. FORGOT PASSWORD
-// ===============================
+
 
 const forgotPassword = async (req, res) => {
   try {
@@ -399,98 +380,85 @@ const forgotPassword = async (req, res) => {
 
 
     // Send email using Resend
-    const { data, error } = await resend.emails.send({
+   // Send email using Brevo
+await apiInstance.sendTransacEmail({
+  sender: {
+    name: "Baat-Chit",
+    email: "abhijeethoshiyar100@gmail.com"
+  },
 
-      from: FROM_EMAIL,
-
-      to: [email],
-
-      subject: "Reset Your Password - Baat-Chit",
-
-      html: `
-        <div style="
-          font-family: Arial, sans-serif;
-          max-width: 500px;
-          margin: auto;
-          padding: 30px;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-        ">
-
-          <h2 style="
-            color: #10b981;
-            text-align: center;
-          ">
-            बात-चीत
-          </h2>
-
-
-          <h3>Reset Your Password</h3>
-
-
-          <p style="
-            color: #4b5563;
-            line-height: 1.6;
-          ">
-            We received a request to reset your password.
-          </p>
-
-
-          <div style="
-            text-align: center;
-            margin: 30px 0;
-          ">
-
-            <a
-              href="${resetUrl}"
-
-              style="
-                background-color: #10b981;
-                color: white;
-                padding: 14px 25px;
-                text-decoration: none;
-                border-radius: 8px;
-                font-weight: bold;
-              "
-            >
-              Reset Password
-            </a>
-
-          </div>
-
-
-          <p style="
-            color: #6b7280;
-          ">
-            This link is valid for 15 minutes.
-          </p>
-
-
-          <p style="
-            color: #9ca3af;
-            font-size: 12px;
-          ">
-            If you did not request this password reset,
-            you can safely ignore this email.
-          </p>
-
-        </div>
-      `,
-    });
-
-
-    if (error) {
-
-      console.error("Resend Error:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send reset email",
-      });
+  to: [
+    {
+      email: email
     }
+  ],
 
+  subject: "Reset Your Password - Baat-Chit",
 
-    console.log("Reset Email Sent:", data);
+  htmlContent: `
+    <div style="
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: auto;
+      padding: 30px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+    ">
+
+      <h2 style="
+        color: #10b981;
+        text-align: center;
+      ">
+        बात-चीत
+      </h2>
+
+      <h3>Reset Your Password</h3>
+
+      <p style="
+        color: #4b5563;
+        line-height: 1.6;
+      ">
+        We received a request to reset your password.
+      </p>
+
+      <div style="
+        text-align: center;
+        margin: 30px 0;
+      ">
+
+        <a
+          href="${resetUrl}"
+          style="
+            background-color: #10b981;
+            color: white;
+            padding: 14px 25px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+          "
+        >
+          Reset Password
+        </a>
+
+      </div>
+
+      <p style="color: #6b7280;">
+        This link is valid for 15 minutes.
+      </p>
+
+      <p style="
+        color: #9ca3af;
+        font-size: 12px;
+      ">
+        If you did not request this password reset,
+        you can safely ignore this email.
+      </p>
+
+    </div>
+  `
+});
+
+console.log("Reset Email Sent Successfully");
 
 
     return res.status(200).json({
@@ -510,9 +478,9 @@ const forgotPassword = async (req, res) => {
 };
 
 
-// ===============================
+
 // 5. RESET PASSWORD
-// ===============================
+
 
 const resetPassword = async (req, res) => {
   try {
