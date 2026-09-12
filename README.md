@@ -64,7 +64,7 @@ A full-stack real-time messaging application built with the MERN stack, WebSocke
 * WebSocket (`ws`)
 * JWT
 * bcrypt
-* Nodemailer
+* Brevo
 
 ### Database
 
