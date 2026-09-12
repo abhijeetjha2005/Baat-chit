@@ -51,7 +51,7 @@ const sendOtp = async (req, res) => {
 
     // Send email using Resend
    // Send email using Brevo
-await brevoClient.sendTransacEmail({
+await brevoClient.transactionalEmails.sendTransacEmail({
   sender: {
     name: "Baat-Chit",
     email: "abhijeethoshiyar100@gmail.com"
@@ -382,7 +382,7 @@ const forgotPassword = async (req, res) => {
 
     // Send email using Resend
    // Send email using Brevo
-await  brevoClient.sendTransacEmail({
+await  brevoClient.transactionalEmails.sendTransacEmail({
   sender: {
     name: "Baat-Chit",
     email: "abhijeethoshiyar100@gmail.com"
