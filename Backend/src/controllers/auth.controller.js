@@ -1,13 +1,13 @@
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const User = require("../models/user.model");
-const OTP = require("../models/otp.models");
 
 const { BrevoClient } = require("@getbrevo/brevo");
 
 const brevoClient = new BrevoClient({
   apiKey: process.env.BREVO_API_KEY,
 });
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("../models/user.model");
+const OTP = require("../models/otp.models");
 
 
 
@@ -51,7 +51,7 @@ const sendOtp = async (req, res) => {
 
     // Send email using Resend
    // Send email using Brevo
-await brevo.sendTransacEmail({
+await brevoClient.sendTransacEmail({
   sender: {
     name: "Baat-Chit",
     email: "abhijeethoshiyar100@gmail.com"
@@ -382,7 +382,7 @@ const forgotPassword = async (req, res) => {
 
     // Send email using Resend
    // Send email using Brevo
-await  brevo.sendTransacEmail({
+await  brevoClient.sendTransacEmail({
   sender: {
     name: "Baat-Chit",
     email: "abhijeethoshiyar100@gmail.com"
