@@ -152,6 +152,10 @@ Create a `.env` file inside the backend directory:
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret
 GEMINI_API_KEY=your_gemini_api_key
+EMAIL_USER=YOUR_email_user
+EMAIL_PASS=your_email_pass
+BERVO_API_KEY=your_brevo_api_key
+
 ```
 
 
@@ -206,23 +210,14 @@ The project uses:
 ```
 
 ## 🌐 Live Demo
+https://baat-chit-bcd1-abhijeetjha2005s-projects.vercel.app/
 
-**Coming soon:** `YOUR_DEPLOYED_FRONTEND_URL`
 
 ## 💻 GitHub
 
 https://github.com/abhijeetjha2005
 
-## 📸 Screenshots
 
-Add screenshots of:
-
-* Login/Register
-* Contact list
-* Real-time chat
-* Voice message
-* File sharing
-* सखा AI
 
 ## 🔮 Future Improvements
 
